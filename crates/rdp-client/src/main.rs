@@ -31,6 +31,7 @@
 
 mod arm_broker;
 mod congestion;
+mod connections;
 mod feed;
 mod prompt;
 mod gateway;

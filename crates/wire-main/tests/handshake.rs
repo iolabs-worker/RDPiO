@@ -59,6 +59,25 @@ fn ber_element(tag: u8, data: &[u8]) -> Vec<u8> {
     out
 }
 
+/// Wrap `data` in a multi-byte application tag (`[APPLICATION n]`).
+fn application_tag(tag: &[u8], data: &[u8]) -> Vec<u8> {
+    let mut out = tag.to_vec();
+    if data.len() < 0x80 {
+        out.push(data.len() as u8);
+    } else {
+        let mut bytes = Vec::new();
+        let mut v = data.len();
+        while v > 0 {
+            bytes.push((v & 0xff) as u8);
+            v >>= 8;
+        }
+        out.push(0x80 | bytes.len() as u8);
+        out.extend(bytes.iter().rev());
+    }
+    out.extend_from_slice(data);
+    out
+}
+
 /// Walk BER elements, recording the last OCTET STRING value.
 fn last_octet_string(mut cur: &[u8]) -> Vec<u8> {
     let mut last = Vec::new();
@@ -144,8 +163,8 @@ fn server_send_encrypted(
     let mut payload = Vec::new();
     security::write_basic_security_header(security::SEC_ENCRYPT, &mut payload);
     payload.extend(sec.seal(pdu));
-    let req = mcs::send_data_request(user_id, channel, &payload);
-    server_send(s, &req);
+    let ind = mcs::send_data_indication(user_id, channel, &payload);
+    server_send(s, &ind);
 }
 
 /// Decrypt a client→server I/O-channel frame, returning (flags, plaintext).
@@ -222,22 +241,15 @@ fn fake_server(listener: TcpListener, expected_channels: usize) {
     content.push(0x01);
     content.push(0x00); // calledConnectId = 0
     content.extend_from_slice(&[0x30, 0x00]); // empty domain params
-    content.extend(ber_element(0x04, &blocks)); // GCC user data
-    let mut resp_body = Vec::new();
-    resp_body.extend_from_slice(&[0x7f, 0x66]); // [APPLICATION 102]
-    if content.len() < 0x80 {
-        resp_body.push(content.len() as u8);
-    } else {
-        let mut bytes = Vec::new();
-        let mut v = content.len();
-        while v > 0 {
-            bytes.push((v & 0xff) as u8);
-            v >>= 8;
-        }
-        resp_body.push(0x80 | bytes.len() as u8);
-        resp_body.extend(bytes.iter().rev());
-    }
-    resp_body.extend_from_slice(&content);
+    // GCC Conference Create Response: [APPLICATION 17] wrapping nodeID, tag,
+    // and the userData (the server data blocks).
+    let mut ccr_inner = Vec::new();
+    ccr_inner.extend(ber_element(0x04, &[0x01])); // nodeID
+    ccr_inner.extend(ber_element(0x04, &[])); // tag
+    ccr_inner.extend(ber_element(0x04, &blocks)); // userData
+    let ccr = application_tag(&[0x7f, 0x11], &ccr_inner);
+    content.extend(ber_element(0x04, &ccr)); // GCC user data
+    let resp_body = application_tag(&[0x7f, 0x66], &content); // [APPLICATION 102]
     server_send(&mut s, &resp_body);
 
     // 3. Erect Domain + Attach User → Attach User Confirm (user id 1001).
@@ -253,7 +265,10 @@ fn fake_server(listener: TcpListener, expected_channels: usize) {
     let mut payload = &parsed.data[..];
     let flags = security::read_basic_security_header(&mut payload).unwrap();
     assert_eq!(flags, security::SEC_EXCHANGE_PKT);
-    let client_random = &payload[..32];
+    // Security Exchange PDU: length(4) + encrypted client random.
+    let random_len = u32::from_le_bytes([payload[0], payload[1], payload[2], payload[3]]) as usize;
+    assert_eq!(random_len, 64);
+    let client_random = &payload[4..36];
 
     let derived = keys::derive(client_random, &SERVER_RANDOM, 0x02);
     // Server perspective: encrypt with the server key, decrypt with the client key.

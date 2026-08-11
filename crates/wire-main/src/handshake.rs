@@ -366,7 +366,42 @@ fn capability_exchange(
     let request = caps::control_pdu(demand.share_id, pdu_source, caps::CONTROL_REQUEST, 1);
     send_encrypted(transport, security, user_id, io_channel, &request)?;
 
+    // The server replies to the Control Request with a Control Confirm; wait
+    // for it so the session starts in a clean state (nothing left in the
+    // socket buffer for the application's first recv).
+    wait_for_control_confirm(transport, security, io_channel)?;
+
     Ok(demand.share_id)
+}
+
+/// Drain I/O-channel PDUs until the server's Control Confirm arrives.
+/// Tolerates unrelated PDUs (server Synchronize, Font List, Auto-Detect).
+fn wait_for_control_confirm(
+    transport: &mut WireTransport,
+    security: &mut security::SecurityLayer,
+    io_channel: u16,
+) -> WireResult<()> {
+    loop {
+        let (_flags, plain) = recv_io_pdu(transport, security, io_channel)?;
+        let mut cur = &plain[..];
+        let Ok((pdu_type, _source)) = caps::read_share_control_header(&mut cur) else {
+            continue;
+        };
+        if pdu_type != caps::PDUTYPE_DATA {
+            continue;
+        }
+        let Ok((_share_id, pdu_type2)) = caps::read_share_data_header(&mut cur) else {
+            continue;
+        };
+        if pdu_type2 != caps::PDUTYPE2_CONTROL || cur.len() < 2 {
+            continue;
+        }
+        let action = u16::from_le_bytes([cur[0], cur[1]]);
+        if action == caps::CONTROL_CONFIRM {
+            tracing::debug!("received Control Confirm; session active");
+            return Ok(());
+        }
+    }
 }
 
 // --- Shared helpers --------------------------------------------------------

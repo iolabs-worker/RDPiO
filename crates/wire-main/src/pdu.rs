@@ -450,7 +450,7 @@ pub mod mcs {
     /// Parse an MCS Channel Join Confirm (bare MCS bytes).
     pub fn parse_channel_join_confirm(pdu: &[u8]) -> WireResult<ChannelJoinConfirm> {
         let mcs = x224::strip_data_header(pdu);
-        if mcs.len() < 9 || (mcs[0] >> 2) != CHOICE_CHANNEL_JOIN_CONFIRM {
+        if mcs.len() < 8 || (mcs[0] >> 2) != CHOICE_CHANNEL_JOIN_CONFIRM {
             return Err(protocol_err!("bad Channel Join Confirm choice"));
         }
         if mcs[1] != 0 {
@@ -460,7 +460,7 @@ pub mod mcs {
             ));
         }
         Ok(ChannelJoinConfirm {
-            channel_id: u16::from_be_bytes([mcs[7], mcs[8]]),
+            channel_id: u16::from_be_bytes([mcs[6], mcs[7]]),
         })
     }
 
@@ -468,6 +468,19 @@ pub mod mcs {
     pub fn send_data_request(user_id: u16, channel_id: u16, payload: &[u8]) -> Vec<u8> {
         let mut out = Vec::with_capacity(9 + payload.len());
         out.push(CHOICE_SEND_DATA_REQUEST << 2); // 0x64
+        out.extend_from_slice(&user_id.to_be_bytes());
+        out.extend_from_slice(&channel_id.to_be_bytes());
+        out.push(DATA_PRIORITY_TOP);
+        out.push(SEGMENTATION_BEGIN_END);
+        out.extend_from_slice(&(payload.len() as u16).to_be_bytes());
+        out.extend_from_slice(payload);
+        out
+    }
+
+    /// Build an MCS Send Data Indication (server → client) on `channel_id`.
+    pub fn send_data_indication(user_id: u16, channel_id: u16, payload: &[u8]) -> Vec<u8> {
+        let mut out = Vec::with_capacity(9 + payload.len());
+        out.push(CHOICE_SEND_DATA_INDICATION << 2 | 0x02); // 0x26
         out.extend_from_slice(&user_id.to_be_bytes());
         out.extend_from_slice(&channel_id.to_be_bytes());
         out.push(DATA_PRIORITY_TOP);

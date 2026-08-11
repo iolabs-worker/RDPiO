@@ -234,6 +234,14 @@ impl WireSession {
         self.transport.insecure()
     }
 
+    /// Switch the session into poll mode: [`Self::recv`] then returns
+    /// `Io(TimedOut)` after `timeout` of silence instead of blocking for the
+    /// connection-level timeout. The UI controller uses this to drive the
+    /// session from its message loop.
+    pub fn set_poll_timeout(&mut self, timeout: std::time::Duration) -> WireResult<()> {
+        self.transport.set_read_timeout(Some(timeout))
+    }
+
     /// Send keyboard/mouse/other input events as a slow-path TS_INPUT_PDU.
     pub fn send_input(&mut self, events: &[InputEvent]) -> WireResult<()> {
         let pdu = crate::pdu::encode_input_pdu(

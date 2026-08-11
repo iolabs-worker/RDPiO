@@ -241,6 +241,13 @@ impl WireTransport {
         self.insecure
     }
 
+    /// Change the socket read timeout (used to switch the session into
+    /// poll mode after the connection sequence completes).
+    pub fn set_read_timeout(&mut self, timeout: Option<Duration>) -> WireResult<()> {
+        self.stream.set_read_timeout(timeout)?;
+        Ok(())
+    }
+
     /// The resolved peer address.
     pub fn peer_addr(&self) -> SocketAddr {
         self.peer

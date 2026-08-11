@@ -31,6 +31,7 @@
 
 mod arm_broker;
 mod congestion;
+mod connect;
 mod connections;
 mod feed;
 mod prompt;
@@ -103,6 +104,8 @@ static GLOBAL_ALLOC: allocator::TrackingAllocator = allocator::TrackingAllocator
 
 use rdp_core::{ClientConfig, Credentials};
 
+use crate::connections::ConnectionProfile;
+
 fn main() {
     // Must precede any window/monitor API so Win32 reports true physical geometry
     // on mixed-DPI multi-monitor setups (see `window::set_process_dpi_aware`).
@@ -137,7 +140,31 @@ fn main() {
         return;
     }
 
-    if args.host.is_some() || args.w365 || args.feed.is_some() {
+    // The classic direct-connection flow: `--host` builds a ConnectionProfile
+    // from the CLI flags and starts the session through the shared entry point
+    // (connect::connect_with_profile) that the saved-connection UI also uses.
+    if args.host.is_some() && !args.w365 && args.feed.is_none() {
+        let mut profile = ConnectionProfile::from_cli(
+            args.host.clone(),
+            args.user.clone(),
+            args.password.clone(),
+            args.insecure,
+        )
+        .expect("--host is present");
+        // `--port` still applies on top of the profile's default (3389).
+        profile.port = args.port;
+
+        let result = connect::connect_with_profile(&profile).map_err(|e| e.to_string());
+        if let Err(err) = result {
+            tracing::error!(error = %err, "connection attempt failed");
+            std::process::exit(1);
+        }
+        return;
+    }
+
+    // W365/AVD modern auth + feed discovery, plus `--host` combined with either,
+    // keep using the full Args-driven path (they need the extra flags).
+    if args.w365 || args.feed.is_some() {
         // Windows opens a window and paints the live desktop. Other platforms
         // run the same protocol stack headless, logging decoded rectangles.
         #[cfg(windows)]
@@ -441,133 +468,14 @@ fn config_from_args(args: &Args) -> ClientConfig {
 }
 
 /// Headless connect path (non-Windows): negotiate, activate, and log decoded
-/// bitmap rectangles. Exercises the entire protocol stack without a GPU.
+/// bitmap rectangles. Exercises the entire protocol stack without a GPU. Used
+/// by the W365/feed paths; the direct `--host` path goes through
+/// [`crate::connect::connect_with_profile`] instead, and the shared headless
+/// run itself lives in [`crate::connect::run_headless`].
 #[cfg(not(windows))]
 fn run_connect(args: &Args) -> Result<(), transport::NegotiateError> {
-    use rdp_pdu::x224::SecurityProtocol;
-
     let config = config_from_args(args);
-
-    tracing::info!(host = %config.hostname, port = config.port, "connecting over TCP");
-    let (mut stream, _connector, protocol) = transport::connect(&config)?;
-    tracing::info!(?protocol, "X.224 negotiation complete");
-
-    // A read timeout prevents hangs against a silent server (set before the TLS
-    // handshake, which also does I/O; it persists on the moved socket).
-    stream
-        .set_read_timeout(Some(std::time::Duration::from_secs(10)))
-        .ok();
-
-    // Enhanced RDP Security (SSL) and NLA (HYBRID) both run inside a TLS tunnel;
-    // Standard RDP Security runs directly over the socket.
-    if protocol.contains(SecurityProtocol::SSL) || protocol.contains(SecurityProtocol::HYBRID) {
-        let mut tls =
-            match tls::TlsStream::connect(stream, &config.hostname, config.allow_invalid_certificate)
-            {
-                Ok(tls) => {
-                    tracing::info!("TLS established (rustls)");
-                    tls
-                }
-                Err(err) => {
-                    tracing::warn!(error = %err, "TLS handshake failed");
-                    return Ok(());
-                }
-            };
-
-        if protocol.contains(SecurityProtocol::HYBRID) {
-            // NLA/CredSSP (MS-CSSP) authenticates over the TLS channel — binding to
-            // the server certificate's public key — before the MCS connection.
-            let cert = match tls.remote_cert_der() {
-                Some(cert) => cert,
-                None => {
-                    tracing::error!("no server certificate available for NLA channel binding");
-                    return Ok(());
-                }
-            };
-            let spn = format!("TERMSRV/{}", config.hostname);
-            let creds = &config.credentials;
-            match rdp_nla::credssp::authenticate(
-                &mut tls,
-                &spn,
-                &cert,
-                &creds.domain,
-                &creds.username,
-                &creds.password,
-            ) {
-                Ok(()) => tracing::info!("NLA/CredSSP complete"),
-                Err(err) => {
-                    tracing::error!(error = %err, "NLA/CredSSP failed");
-                    return Ok(());
-                }
-            }
-        }
-
-        headless_run(&mut tls, &config, protocol);
-    } else {
-        // Standard RDP Security (no TLS): run directly over the socket.
-        headless_run(&mut stream, &config, protocol);
-    }
-    Ok(())
-}
-
-/// Activate and run a headless session over any `Read + Write` transport, logging
-/// decoded rectangles. Shared by the plaintext and rustls-TLS paths.
-#[cfg(not(windows))]
-fn headless_run<S: std::io::Read + std::io::Write>(
-    stream: &mut S,
-    config: &rdp_core::ClientConfig,
-    protocol: rdp_pdu::x224::SecurityProtocol,
-) {
-    match session::activate(stream, config, protocol, None) {
-        Ok(mut active) => {
-            tracing::info!(info = ?active.info(), "RDP session ACTIVE");
-            let mut sink = LogSink::default();
-            if let Err(err) = session::run_session(stream, &mut active, &mut sink) {
-                tracing::info!(error = %err, "session ended");
-            }
-        }
-        Err(err) => tracing::warn!(error = %err, "activation stopped"),
-    }
-}
-
-/// Headless frame sink: logs decoded bitmap rectangles (non-Windows builds).
-#[cfg(not(windows))]
-#[derive(Default)]
-struct LogSink {
-    rects: u64,
-}
-
-#[cfg(not(windows))]
-impl session::FrameSink for LogSink {
-    fn blit(&mut self, x: u16, y: u16, w: u16, h: u16, rgba: &[u8]) {
-        self.rects += 1;
-        tracing::debug!(x, y, w, h, bytes = rgba.len(), "paint rect");
-    }
-
-    fn present(&mut self) {
-        tracing::info!(painted_rects = self.rects, "frame presented");
-    }
-
-    fn cursor(&mut self, update: session::CursorUpdate) {
-        match update {
-            session::CursorUpdate::Hide => tracing::debug!("cursor update: hide"),
-            session::CursorUpdate::Default => tracing::debug!("cursor update: default arrow"),
-            session::CursorUpdate::Shape {
-                width,
-                height,
-                hot_x,
-                hot_y,
-                rgba,
-            } => tracing::debug!(
-                width,
-                height,
-                hot_x,
-                hot_y,
-                bytes = rgba.len(),
-                "cursor update: shape"
-            ),
-        }
-    }
+    crate::connect::run_headless(&config)
 }
 
 /// Quality preset for the latency/clarity trade-offs the client controls.
@@ -739,7 +647,72 @@ struct Args {
     teams_native: bool,
 }
 
+impl Default for Args {
+    fn default() -> Self {
+        Self {
+            host: None,
+            port: 3389,
+            user: None,
+            domain: None,
+            password: None,
+            insecure: false,
+            drive: Vec::new(),
+            multimon: false,
+            fullscreen: false,
+            cpu_yuv: false,
+            udp: false,
+            shortpath: false,
+            printer: false,
+            udp_debug: false,
+            clipboard_dir: None,
+            width: None,
+            height: None,
+            legacy: false,
+            keyboard_layout: None,
+            bpp: None,
+            low_latency: false,
+            quality: QualityPreset::default(),
+            force_avc444: false,
+            no_avc: false,
+            render_scale: 1.0,
+            per_monitor: false,
+            no_seed: false,
+            pace: 0,
+            upscale: rdp_gpu::Upscaler::default(),
+            sharpen: None,
+            backend: rdp_gpu::Backend::default(),
+            replay_gfx: None,
+            log_file: None,
+            feed: None,
+            w365: false,
+            w365_device_code: false,
+            w365_relogin: false,
+            forget_password: false,
+            tenant: None,
+            client_id: None,
+            rdp_file: None,
+            teams: false,
+            teams_native: false,
+        }
+    }
+}
+
 impl Args {
+    /// Build a default `Args` from a [`ConnectionProfile`] for the windowed
+    /// connect path (`win::run_connected` still consumes `Args`). Only the
+    /// profile-carried fields are set; every extended display flag stays at
+    /// its default, because the profile is the source of truth.
+    #[cfg(windows)]
+    fn from_profile(profile: &ConnectionProfile) -> Self {
+        let mut args = Args::default();
+        args.host = Some(profile.host.clone());
+        args.port = profile.port;
+        args.user = Some(profile.username.clone());
+        args.password = profile.password.clone();
+        args.insecure = profile.insecure;
+        args
+    }
+
     fn from_env() -> Self {
         let mut args = Args {
             host: None,
@@ -1168,7 +1141,7 @@ fn init_tracing(log_file: Option<&str>) {
 }
 
 #[cfg(windows)]
-mod connect;
+mod connect_windows;
 
 #[cfg(windows)]
 mod iocp;
@@ -1262,7 +1235,7 @@ mod win {
 
     use crate::window::{Frame, RawInput, Window};
     use crate::{
-        config_from_args, connect, feed, gateway, net_listener, reconnect_delay,
+        config_from_args, connect_windows, feed, gateway, net_listener, reconnect_delay,
         save_reconnect_cookie, session, w365, Args,
     };
     use rdp_pdu::input as inpdu;
@@ -3465,7 +3438,7 @@ mod win {
                 tracing::info!("found persisted reconnect cookie; will try to resume session");
             }
             loop {
-                match connect::establish_reconnect(&mut config,
+                match connect_windows::establish_reconnect(&mut config,
                     persisted_cookie.as_ref()
                 ) {
                     Ok(c) => break c,
@@ -3672,7 +3645,7 @@ mod win {
                     attempts = 0;
                     c
                 }
-                None => match connect::establish_reconnect(&mut config, cookie.as_ref()) {
+                None => match connect_windows::establish_reconnect(&mut config, cookie.as_ref()) {
                     Ok(c) => {
                         attempts = 0;
                         c
@@ -3701,7 +3674,7 @@ mod win {
                 },
             };
 
-            let connect::Established {
+            let connect_windows::Established {
                 transport,
                 mut session,
                 control,
@@ -3719,7 +3692,7 @@ mod win {
             // never decodes and the screen stays black.
             let graphics_path = matches!(
                 transport,
-                connect::Transport::Tls(_) | connect::Transport::WebSocketTls(_)
+                connect_windows::Transport::Tls(_) | connect_windows::Transport::WebSocketTls(_)
             );
             // Dial info for the UDP side-band, captured by the worker. Gated on
             // `config.multitransport` — the exact condition under which we
@@ -3727,7 +3700,7 @@ mod win {
             // side-band we told the server we'd bring up. It is restricted to the
             // direct TLS host (a real `host:port`); the Reverse Connect / WebSocket
             // transports have no direct address to dial, so they never bring up UDP.
-            let direct_tls = matches!(transport, connect::Transport::Tls(_));
+            let direct_tls = matches!(transport, connect_windows::Transport::Tls(_));
             let udp_dial = (config.multitransport && direct_tls).then(|| crate::udp::UdpDial {
                 server: format!("{}:{}", config.hostname, config.port),
                 hostname: config.hostname.clone(),

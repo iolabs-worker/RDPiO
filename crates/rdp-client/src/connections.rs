@@ -63,6 +63,33 @@ impl Default for ConnectionProfile {
     }
 }
 
+impl ConnectionProfile {
+    /// Build a profile from the direct CLI connection flags (`--host`,
+    /// `--user`, `--password`, `--insecure`), preserving the defaults the
+    /// command line has always used: host is required (returns `None` without
+    /// it), the user defaults to an empty logon name, the password to `None`,
+    /// and TLS certificate validation stays on unless `--insecure` is given.
+    /// The port defaults to 3389 and the display name mirrors the host.
+    pub fn from_cli(
+        host: Option<String>,
+        user: Option<String>,
+        password: Option<String>,
+        insecure: bool,
+    ) -> Option<Self> {
+        let host = host?;
+        Some(Self {
+            name: host.clone(),
+            host,
+            port: DEFAULT_PORT,
+            username: user.unwrap_or_default(),
+            password,
+            insecure,
+            saved: false,
+            last_connected_at: None,
+        })
+    }
+}
+
 /// JSON-backed store of [`ConnectionProfile`]s.
 ///
 /// One store owns one file. `load()` opens the well-known location for the
@@ -403,5 +430,41 @@ mod tests {
         assert!(corrupt_path(&path).exists(), "corrupt file was renamed");
         assert!(!path.exists(), "original file was moved away");
         let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    #[test]
+    fn from_cli_requires_host() {
+        assert!(ConnectionProfile::from_cli(None, None, None, false).is_none());
+        assert!(ConnectionProfile::from_cli(None, Some("u".into()), Some("p".into()), true)
+            .is_none());
+    }
+
+    #[test]
+    fn from_cli_applies_default_user_password_and_port() {
+        let p = ConnectionProfile::from_cli(Some("10.0.0.5".into()), None, None, false)
+            .expect("host given");
+        assert_eq!(p.host, "10.0.0.5");
+        assert_eq!(p.name, "10.0.0.5", "display name mirrors the host");
+        assert_eq!(p.port, DEFAULT_PORT);
+        assert_eq!(p.username, "", "user defaults to an empty logon name");
+        assert_eq!(p.password, None, "password defaults to None");
+        assert!(!p.insecure, "certificate validation stays on by default");
+        assert!(!p.saved);
+        assert_eq!(p.last_connected_at, None);
+    }
+
+    #[test]
+    fn from_cli_carries_user_password_and_insecure() {
+        let p = ConnectionProfile::from_cli(
+            Some("server.corp".into()),
+            Some("alice".into()),
+            Some("s3cret".into()),
+            true,
+        )
+        .expect("host given");
+        assert_eq!(p.host, "server.corp");
+        assert_eq!(p.username, "alice");
+        assert_eq!(p.password.as_deref(), Some("s3cret"));
+        assert!(p.insecure, "--insecure is recorded on the profile");
     }
 }

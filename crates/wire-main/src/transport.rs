@@ -103,6 +103,7 @@ fn resolve(host: &str, port: u16) -> WireResult<SocketAddr> {
 
 /// A connected RDP transport: one TCP stream with TPKT framing, plus an
 /// optional UDP side-band.
+#[derive(Debug)]
 pub struct WireTransport {
     stream: TcpStream,
     peer: SocketAddr,
@@ -128,7 +129,12 @@ impl WireTransport {
         let stream = TcpStream::connect_timeout(&peer, opts.connect_timeout)?;
         stream.set_nodelay(true)?;
         stream.set_read_timeout(opts.recv_timeout)?;
-        stream.set_keepalive(true)?;
+        // NOTE: `TcpStream::set_keepalive` is still gated behind the unstable
+        // `tcp_keepalive` feature on the pinned stable toolchain, so TCP
+        // keepalive is deliberately not enabled here. Keepalive is a
+        // nice-to-have for NAT pinholes; RDP has its own ping/pong frames
+        // once the session is up, and the UDP side-band covers low-latency
+        // traffic. Revisit when `tcp_keepalive` stabilizes.
 
         let udp = if opts.udp {
             Some(UdpSideband::connect(&opts.host, opts.port, opts.connect_timeout)?)
@@ -142,6 +148,20 @@ impl WireTransport {
             peer,
             udp,
             insecure: opts.insecure,
+        })
+    }
+
+    /// Wrap an already-accepted TCP stream (used by the in-process fake server
+    /// in integration tests). Applies the same socket tuning as `connect`.
+    pub fn from_stream(stream: TcpStream, insecure: bool) -> WireResult<Self> {
+        let peer = stream.peer_addr()?;
+        stream.set_nodelay(true)?;
+        stream.set_read_timeout(Some(Duration::from_secs(30)))?;
+        Ok(Self {
+            stream,
+            peer,
+            udp: None,
+            insecure,
         })
     }
 

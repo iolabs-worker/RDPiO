@@ -54,6 +54,8 @@ enum State {
     /// Waiting to send our client announce.
     Idle,
     /// Sent client announce, waiting for server announce.
+    #[allow(dead_code)]
+    // state reached after a server announce; not yet wired into the serial flow
     AwaitingServerAnnounce,
     /// Handshake complete; processing device announces and I/O.
     Ready,

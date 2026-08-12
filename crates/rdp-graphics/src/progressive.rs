@@ -104,6 +104,7 @@ const DQ_GR: u32 = 3;
 #[derive(Clone, Copy, PartialEq, Eq)]
 enum RlgrMode {
     Rlgr1,
+    #[allow(dead_code)] // third-generation RLGR not yet selectable; kept for parity with the spec
     Rlgr3,
 }
 

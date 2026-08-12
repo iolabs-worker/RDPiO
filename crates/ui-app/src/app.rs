@@ -207,7 +207,10 @@ impl AppController {
                 if name == crate::redirection::CLIPBOARD_CHANNEL {
                     AppEvent::Clipboard { data }
                 } else {
-                    AppEvent::DeviceData { channel: name, data }
+                    AppEvent::DeviceData {
+                        channel: name,
+                        data,
+                    }
                 }
             }
             ServerPdu::Update(unit) | ServerPdu::GraphicsUpdate(unit) => {
@@ -232,7 +235,9 @@ impl AppController {
 /// Parse frame metadata out of a (possibly Annex-B) H.264 payload.
 fn frame_meta(payload: &[u8]) -> (bool, Option<crate::decode::H264Config>) {
     let nals = crate::decode::annex_b_nal_units(payload);
-    let is_keyframe = nals.iter().any(|n| n.nal_type == crate::decode::NAL_TYPE_IDR);
+    let is_keyframe = nals
+        .iter()
+        .any(|n| n.nal_type == crate::decode::NAL_TYPE_IDR);
     let cfg = crate::decode::parse_config(&nals);
     (is_keyframe, cfg)
 }
@@ -273,10 +278,7 @@ mod tests {
     #[test]
     fn send_without_connect_errors() {
         let mut c = AppController::new(opts("127.0.0.1"));
-        assert!(matches!(
-            c.send_input(&[]),
-            Err(WireError::Sequence(_))
-        ));
+        assert!(matches!(c.send_input(&[]), Err(WireError::Sequence(_))));
         assert!(matches!(
             c.send_redirection("cliprdr", &[1, 2, 3]),
             Err(WireError::Sequence(_))

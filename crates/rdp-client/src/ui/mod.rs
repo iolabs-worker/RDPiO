@@ -11,6 +11,7 @@
 
 /// The decision from one round of [`UiWindow::handle_events`].
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[allow(dead_code)] // event surface shared with the Windows connbar; exercised there
 pub enum UiEvent {
     /// Keep the loop running. `resize` carries the new client-area size the
     /// swapchain was (or should be) resized to, if it changed.
@@ -21,6 +22,7 @@ pub enum UiEvent {
 
 impl UiEvent {
     /// Whether the run loop should stop after this event.
+    #[allow(dead_code)] // used by the Windows window/connbar run loops
     pub fn quit(&self) -> bool {
         matches!(self, UiEvent::Quit)
     }
@@ -29,6 +31,7 @@ impl UiEvent {
 /// Client-area size bookkeeping with the minimum clamp the swapchain and RDP
 /// desktop share. Pure logic so it is testable without a display.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[allow(dead_code)] // used by the Windows window sizing path
 pub struct WindowSize {
     width: u32,
     height: u32,
@@ -37,6 +40,7 @@ pub struct WindowSize {
 impl WindowSize {
     /// A size clamped to at least 1×1 (both D3D11 swapchains and RDP desktops
     /// reject zero).
+    #[allow(dead_code)] // used by the Windows window sizing path
     pub fn new(width: u32, height: u32) -> Self {
         Self {
             width: width.max(1),
@@ -45,6 +49,7 @@ impl WindowSize {
     }
 
     /// The current size as `(width, height)`.
+    #[allow(dead_code)] // used by the Windows window sizing path
     pub fn get(&self) -> (u32, u32) {
         (self.width, self.height)
     }
@@ -52,6 +57,7 @@ impl WindowSize {
     /// Apply a new size, returning `true` if anything actually changed. This is
     /// the bookkeeping the UI loop uses to decide whether the swapchain needs a
     /// resize before the next present.
+    #[allow(dead_code)] // used by the Windows window sizing path
     pub fn set(&mut self, width: u32, height: u32) -> bool {
         let next = Self::new(width, height);
         if next == *self {

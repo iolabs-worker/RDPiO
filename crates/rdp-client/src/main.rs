@@ -29,6 +29,7 @@
 //! decoded bitmap rectangles are painted to the window via D3D11; elsewhere they
 //! are logged (headless), which keeps the whole protocol stack runnable in CI.
 
+#[cfg_attr(not(windows), allow(dead_code))]
 mod arm_broker;
 mod congestion;
 mod connect;
@@ -95,10 +96,12 @@ fn resolve_rdstls_password(account: &str, explicit: Option<&str>) -> String {
 }
 
 #[cfg(not(windows))]
+#[allow(dead_code)] // signature parity with the Windows DPAPI path; no caller on headless builds
 fn resolve_rdstls_password(_account: &str, explicit: Option<&str>) -> String {
     explicit.map(str::to_string).unwrap_or_default()
 }
 
+#[cfg_attr(not(windows), allow(dead_code))]
 mod allocator;
 
 #[global_allocator]
@@ -239,6 +242,7 @@ fn gfx_caps_for(
 /// Pure caps-selection policy, factored out of [`gfx_caps_for`] so it's testable
 /// without a GPU device. `gpu_h264` is evaluated lazily — only the final
 /// (non-gaming, no explicit override) branch probes the local decoder.
+#[allow(dead_code)] // used by the Windows GPU caps path and unit tests
 fn caps_from_flags(
     no_avc: bool,
     force_avc444: bool,
@@ -288,6 +292,7 @@ fn caps_from_flags(
 /// size scaled by `scale`, rounded to even (RDP needs even dimensions) and
 /// clamped to RDP's 200..=8192 per-axis range. The window stays native; the
 /// client GPU upscales this smaller desktop on present.
+#[allow(dead_code)] // used by the Windows window-sizing path and unit tests
 fn scaled_desktop_dims(win_w: u32, win_h: u32, scale: f32) -> (u32, u32) {
     let scale = scale.clamp(0.4, 1.0);
     let one = |v: u32| -> u32 {
@@ -302,6 +307,7 @@ fn scaled_desktop_dims(win_w: u32, win_h: u32, scale: f32) -> (u32, u32) {
 /// per-monitor windows emit input in), and the framebuffer slice it presents
 /// (the scaled monitor rectangle under render-scale; the native one otherwise).
 #[derive(Debug, Clone, Copy)]
+#[allow(dead_code)] // used by the Windows multi-monitor layout path
 struct MonitorPlacement {
     /// Window position on the physical screen (virtual-screen coordinates).
     screen: (i32, i32),
@@ -328,6 +334,7 @@ struct MonitorPlacement {
 /// translating the bounding-box origin to desktop (0,0), which is exactly the
 /// subtraction used for the slice origins here, so EGFX surface offsets land
 /// on the same coordinates.
+#[allow(dead_code)] // used by the Windows multi-monitor layout path and unit tests
 fn scale_monitor_layout(
     rects: &[rdp_pdu::gcc::VirtualScreenRect],
     scale: f32,
@@ -371,6 +378,7 @@ fn scale_monitor_layout(
 
 /// Exponential backoff with jitter for auto-reconnect retries.
 /// attempt 1 = ~500 ms, attempt 2 = ~1 s, doubling up to a 30 s cap.
+#[allow(dead_code)] // reconnect backoff used by the Windows reconnection path
 fn reconnect_delay(attempt: u32) -> std::time::Duration {
     const MAX_DELAY: std::time::Duration = std::time::Duration::from_secs(30);
     const BASE: std::time::Duration = std::time::Duration::from_millis(500);
@@ -389,6 +397,7 @@ fn reconnect_delay(attempt: u32) -> std::time::Duration {
 /// Path to the persisted reconnect cookie for a given hostname. The cookie is
 /// host-specific so a new connection to a different host doesn't accidentally
 /// reuse stale state.
+#[allow(dead_code)] // used by the Windows reconnection path
 fn reconnect_cookie_path(hostname: &str) -> std::path::PathBuf {
     use std::collections::hash_map::DefaultHasher;
     use std::hash::{Hash, Hasher};
@@ -404,6 +413,7 @@ fn reconnect_cookie_path(hostname: &str) -> std::path::PathBuf {
     }
 }
 
+#[allow(dead_code)] // used by the Windows reconnection path
 fn save_reconnect_cookie(
     hostname: &str,
     cookie: &rdp_pdu::logon::ReconnectCookie,
@@ -415,6 +425,7 @@ fn save_reconnect_cookie(
     std::fs::write(path, buf)
 }
 
+#[allow(dead_code)] // used by the Windows reconnection path
 fn load_reconnect_cookie(hostname: &str) -> Option<rdp_pdu::logon::ReconnectCookie> {
     let path = reconnect_cookie_path(hostname);
     let data = std::fs::read(path).ok()?;
@@ -1106,6 +1117,7 @@ fn expand_drive_args(drives: &[String]) -> Vec<String> {
 /// The effective RCAS sharpen strength: an explicit `--sharpen` wins; otherwise
 /// FSR defaults to 0.9 (≈ AMD's recommended 0.2-stop RCAS attenuation — FSR 1.0
 /// is designed as the EASU+RCAS pair) and every other upscaler to off.
+#[allow(dead_code)] // used by the Windows present path and unit tests
 fn effective_sharpen(sharpen: Option<f32>, upscale: rdp_gpu::Upscaler) -> f32 {
     match sharpen {
         Some(s) => s.clamp(0.0, 1.0),

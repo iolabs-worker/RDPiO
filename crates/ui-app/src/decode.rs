@@ -27,6 +27,7 @@ pub const NAL_TYPE_PPS: u8 = 8;
 pub const NAL_TYPE_SEI: u8 = 6;
 
 /// The smallest possible start code (3-byte `00 00 01`).
+#[allow(dead_code)] // H.264 start-code marker retained for future NAL parsing
 const START_CODE: [u8; 3] = [0x00, 0x00, 0x01];
 
 /// Scan for the next Annex-B start code at or after `from`, returning the
@@ -196,6 +197,7 @@ impl<'a> BitReader<'a> {
         })
     }
 
+    #[allow(dead_code)] // RBSP trailing-bit check; not needed by the current NAL walker
     fn more_rbsp(&self) -> bool {
         self.pos / 8 < self.data.len()
     }

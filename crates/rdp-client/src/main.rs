@@ -31,16 +31,33 @@
 
 #[cfg_attr(not(windows), allow(dead_code))]
 mod arm_broker;
+// UDP congestion control: consumed only by the Windows GPU session loop
+// (`run_graphics_session`) and the cfg(windows) `udp` module, so it is dead
+// code on headless Linux builds until the Windows session path is ported.
+#[cfg_attr(not(windows), allow(dead_code))]
 mod congestion;
 mod connect;
 mod connections;
+// RDWeb/W365 feed parsing: consumed only by `w365` (below) and the Windows
+// `win::run_connected` / cloud-PC-picker paths, not by the headless runner.
+#[cfg_attr(not(windows), allow(dead_code))]
 mod feed;
+// Gateway config parsing: consumed only by the Windows UI/connect paths.
+#[cfg_attr(not(windows), allow(dead_code))]
 mod gateway;
+// Session performance telemetry: sampled by the Windows session loop and
+// reported by the Windows UI; nothing on the headless path records it.
+#[cfg_attr(not(windows), allow(dead_code))]
 mod metrics;
+// Console password prompt: only the Windows DPAPI credential path calls it.
+#[cfg_attr(not(windows), allow(dead_code))]
 mod prompt;
 mod rng;
 mod session;
 mod transport;
+// W365/AVD OAuth + feed auth: consumed by the Windows WebView2/device-code
+// sign-in paths and `arm_broker`; unused by the headless `--host` runner.
+#[cfg_attr(not(windows), allow(dead_code))]
 mod w365;
 // W365/AVD Reverse Connect (RDSTLS over a TLS WebSocket) + its Windows-only UI
 // (WebView2 sign-in / Cloud PC picker) and platform bits. These depend on the

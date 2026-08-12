@@ -139,7 +139,7 @@ impl DeviceCodeFlow {
 #[derive(Debug, thiserror::Error)]
 pub enum AuthError {
     #[error("network error during authentication: {0}")]
-    Network(#[from] ureq::Error),
+    Network(Box<ureq::Error>),
     #[error("I/O error reading authentication response: {0}")]
     Io(#[from] std::io::Error),
     #[error("JSON error: {0}")]
@@ -151,6 +151,12 @@ pub enum AuthError {
     #[allow(dead_code)]
     #[error("authorization pending; user has not completed the prompt")]
     Pending,
+}
+
+impl From<ureq::Error> for AuthError {
+    fn from(e: ureq::Error) -> Self {
+        AuthError::Network(Box::new(e))
+    }
 }
 
 /// Authenticate via OAuth2 device-code flow.
@@ -520,22 +526,25 @@ pub fn discover_cached_cloud_pcs() -> Vec<crate::feed::FeedEntry> {
             continue; // same Cloud PC under a different cache id
         }
 
-        let mut entry = crate::feed::FeedEntry::default();
-        entry.display_name = settings
-            .get("remotedesktopname")
-            .filter(|s| !s.is_empty())
-            .cloned()
-            .unwrap_or_else(|| "Cloud PC".to_string());
-        // `remoteapplicationprogram` is `||<resourceId>`; the GUID distinguishes
-        // Cloud PCs that share a SKU display name. Used only as a picker label.
-        entry.resource_id = settings
-            .get("remoteapplicationprogram")
-            .map(|s| s.trim_start_matches('|').to_string())
-            .unwrap_or_default();
-        entry.tenant_id = settings.get("aadtenantid").cloned().unwrap_or_default();
-        entry.gateway_fqdn = settings.get("gatewayhostname").cloned().unwrap_or_default();
-        entry.load_balance_info = Some(lbi.into_bytes());
-        entry.rdp_file = Some(rdp_contents);
+        let entry = crate::feed::FeedEntry {
+            display_name: settings
+                .get("remotedesktopname")
+                .filter(|s| !s.is_empty())
+                .cloned()
+                .unwrap_or_else(|| "Cloud PC".to_string()),
+            // `remoteapplicationprogram` is `||<resourceId>`; the GUID
+            // distinguishes Cloud PCs that share a SKU display name. Used only
+            // as a picker label.
+            resource_id: settings
+                .get("remoteapplicationprogram")
+                .map(|s| s.trim_start_matches('|').to_string())
+                .unwrap_or_default(),
+            tenant_id: settings.get("aadtenantid").cloned().unwrap_or_default(),
+            gateway_fqdn: settings.get("gatewayhostname").cloned().unwrap_or_default(),
+            load_balance_info: Some(lbi.into_bytes()),
+            rdp_file: Some(rdp_contents),
+            ..crate::feed::FeedEntry::default()
+        };
         entries.push(entry);
     }
 

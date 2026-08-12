@@ -59,13 +59,19 @@ impl Default for FeedEntry {
 #[derive(Debug, thiserror::Error)]
 pub enum FeedError {
     #[error("network error fetching feed: {0}")]
-    Network(#[from] ureq::Error),
+    Network(Box<ureq::Error>),
     #[error("I/O error reading feed response: {0}")]
     Io(#[from] std::io::Error),
     #[error("feed parse error: {0}")]
     Parse(String),
     #[error("no hosts found in feed")]
     Empty,
+}
+
+impl From<ureq::Error> for FeedError {
+    fn from(e: ureq::Error) -> Self {
+        FeedError::Network(Box::new(e))
+    }
 }
 
 /// Fetch a feed from `url` and parse every host entry it contains.

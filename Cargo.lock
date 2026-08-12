@@ -4762,6 +4762,7 @@ dependencies = [
 name = "ui-app"
 version = "0.0.1"
 dependencies = [
+ "raw-window-handle",
  "thiserror 1.0.69",
  "tracing",
  "tracing-subscriber",

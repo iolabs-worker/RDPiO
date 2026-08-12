@@ -49,15 +49,25 @@ fn run(opts: cli::CliOptions) -> ExitCode {
     headless::run(opts)
 }
 
-/// Headless front-end for non-Windows hosts. Opens the connection through
-/// the shared controller (which enforces "session only after connection
+/// Headless front-end for non-Windows hosts. Opens the window through the
+/// shared [`AppWindow`] abstraction — the headless implementation never touches
+/// a display, so CI and unit tests can run this path on any host — connects
+/// through the shared controller (which enforces "session only after connection
 /// setup succeeds"), reports the result, and tears down cleanly.
 #[cfg(not(windows))]
 mod headless {
     use super::app::AppController;
+    use ui_app::ui::window::{AppWindow, Frame, HeadlessWindow, WindowOptions};
 
     pub fn run(opts: super::cli::CliOptions) -> super::ExitCode {
         let mut controller = AppController::new(opts);
+        let mut window = match HeadlessWindow::open(WindowOptions::for_opts(controller.opts())) {
+            Ok(w) => w,
+            Err(err) => {
+                eprintln!("headless window setup failed: {err}");
+                return super::ExitCode::FAILURE;
+            }
+        };
         match controller.connect() {
             Ok(()) => {
                 let peer = controller
@@ -65,6 +75,12 @@ mod headless {
                     .map(|t| t.peer_addr().to_string())
                     .unwrap_or_default();
                 tracing::info!(%peer, "connected; headless host — no window to paint");
+                // Close through the abstraction: no OS delivers events here, so
+                // the pump must report the quit decision directly.
+                window.request_close();
+                if window.pump() != Frame::Quit {
+                    tracing::warn!("headless window ignored the close request");
+                }
                 controller.close();
                 super::ExitCode::SUCCESS
             }

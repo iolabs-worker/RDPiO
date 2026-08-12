@@ -81,8 +81,10 @@ pub fn mouse_button(button: MouseButton, down: bool, x: u16, y: u16) -> InputEve
     InputEvent::Mouse { flags, x, y }
 }
 
-/// Rotate the wheel by one notch (120) at `(x, y)`.
-pub fn mouse_wheel(direction: WheelDirection, x: u16, y: u16) -> InputEvent {
+/// Rotate the wheel by one notch (120) at `(x, _y)`. The position's y
+/// coordinate is not part of the RDP extended-mouse encoding (the `y` field of
+/// `ExtendedMouse` carries the rotation magnitude), so it is ignored.
+pub fn mouse_wheel(direction: WheelDirection, x: u16, _y: u16) -> InputEvent {
     let mut flags = ptr::WHEEL;
     if direction == WheelDirection::Down {
         flags |= PTR_FLAG_WHEEL_NEGATIVE;

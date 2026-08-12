@@ -11,11 +11,11 @@ pub mod decode;
 pub mod input;
 pub mod monitor;
 pub mod redirection;
+pub mod ui;
 
 #[cfg(windows)]
 pub mod render;
-#[cfg(windows)]
-pub mod window;
 
 pub use app::{AppController, AppEvent};
 pub use cli::{CliError, CliOptions};
+pub use ui::{AppWindow, Frame, HeadlessWindow, NativeWindowHandle, UiError, WindowEvent, WindowOptions};

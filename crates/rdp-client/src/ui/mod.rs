@@ -117,4 +117,40 @@ mod tests {
             _ => panic!("expected Continue with a resize"),
         }
     }
+
+    /// Headless decode→UI handoff: decoded frames pushed through the bounded
+    /// channel arrive at the UI side in order, and each converts to the exact
+    /// present operation the window's swap chain applies. Runs without a
+    /// display (CPU frames only — the GPU surface type cannot even be
+    /// constructed on a non-Windows host).
+    #[test]
+    fn decoded_frames_flow_from_decoder_to_present_op() {
+        use rdp_gpu::frame::{frame_channel, present_op, DecodedFrame, PresentOp};
+
+        let (tx, rx) = frame_channel(4);
+        // Decoder side: a burst of decoded frames (as the H.264 path emits).
+        for i in 0..3i64 {
+            let nv12 = vec![i as u8; 128 * 128 * 3 / 2];
+            let frame = DecodedFrame::from_nv12(nv12, 128, 128, i).expect("valid NV12");
+            assert!(tx.send(frame), "handoff queue has room");
+        }
+        // UI side: drain everything queued and convert each frame to its
+        // present op — the exact dispatch `UiWindow::present_decoded` runs.
+        let mut count = 0;
+        while let Ok(frame) = rx.try_recv() {
+            count += 1;
+            match present_op(&frame) {
+                PresentOp::Nv12 {
+                    width,
+                    height,
+                    nv12,
+                } => {
+                    assert_eq!((width, height), (128, 128));
+                    assert_eq!(nv12.len(), 128 * 128 * 3 / 2);
+                }
+                other => panic!("frame must convert to the Nv12 present op, got {other:?}"),
+            }
+        }
+        assert_eq!(count, 3, "all three frames crossed the handoff");
+    }
 }

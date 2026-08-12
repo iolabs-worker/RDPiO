@@ -23,6 +23,12 @@ pub use backend::{Backend, Renderer};
 #[cfg(windows)]
 pub mod h264;
 
+/// Decode → UI frame handoff: the [`DecodedFrame`] type and the non-blocking
+/// channel that carries it from the decode path to the UI window's swap chain.
+/// Platform-neutral (the D3D11 surface only appears behind `#[cfg(windows)]`),
+/// so the conversion/handoff logic is unit-testable on headless hosts.
+pub mod frame;
+
 #[cfg(not(windows))]
 mod stub;
 #[cfg(not(windows))]

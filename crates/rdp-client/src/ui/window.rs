@@ -4,6 +4,7 @@
 //! parent `ui` module; on Linux only the platform-neutral pieces in
 //! `crate::ui` compile, so the client stays headless there.
 
+use rdp_gpu::frame::{DecodedFrame, PresentOp};
 use rdp_gpu::Renderer;
 
 use crate::ui::{UiEvent, WindowSize};
@@ -41,6 +42,63 @@ impl UiWindow {
 
     /// Present the current framebuffer on the window's swap chain.
     pub fn present_frame(&mut self) -> windows::core::Result<()> {
+        self.renderer.present_frame()
+    }
+
+    /// Present one decoded frame on the window's swap chain — the decode→UI
+    /// handoff sink. The frame arrives over the `rdp_gpu::frame` channel from
+    /// the decode thread (which never blocks on this call); here it is
+    /// color-converted into the swapchain framebuffer and presented:
+    ///
+    /// - a GPU frame ([`PresentOp::Gpu`]) is blitted zero-copy — the D3D11 NV12
+    ///   texture goes straight to the renderer's video processor, no CPU copy,
+    ///   with a CPU read-back fallback if the processor refuses the surface;
+    /// - a CPU frame ([`PresentOp::Nv12`]) is uploaded and converted on the
+    ///   GPU, again with a CPU fallback so a frame is never dropped.
+    pub fn present_decoded(&mut self, frame: &DecodedFrame) -> windows::core::Result<()> {
+        match rdp_gpu::frame::present_op(frame) {
+            PresentOp::Gpu {
+                texture,
+                width,
+                height,
+            } => {
+                // Zero-copy: the whole frame is dirty (a decoder frame is a
+                // complete picture), so blit it with no region rects.
+                if !self
+                    .renderer
+                    .blit_texture(0, 0, width, height, texture, &[])
+                {
+                    // The video processor refused the surface — read it back
+                    // and convert on the CPU rather than dropping the frame.
+                    if let Some(nv12) = self.renderer.read_nv12(texture, width, height) {
+                        self.renderer.blit_nv12(0, 0, width, height, &nv12, &[]);
+                    }
+                }
+            }
+            PresentOp::Nv12 {
+                nv12,
+                width,
+                height,
+            } => {
+                if !self.renderer.blit_nv12(0, 0, width, height, nv12, &[]) {
+                    // No GPU conversion path (or it failed): CPU NV12→RGBA.
+                    let (yp, uv) = nv12.split_at((width as usize) * (height as usize));
+                    if let Some(rgba) = rdp_graphics::yuv::nv12_to_rgba(
+                        yp,
+                        uv,
+                        width as usize,
+                        height as usize,
+                        width as usize,
+                    ) {
+                        let (w, h) = (
+                            width.min(u16::MAX as u32) as u16,
+                            height.min(u16::MAX as u32) as u16,
+                        );
+                        self.renderer.update_rect(0, 0, w, h, &rgba);
+                    }
+                }
+            }
+        }
         self.renderer.present_frame()
     }
 

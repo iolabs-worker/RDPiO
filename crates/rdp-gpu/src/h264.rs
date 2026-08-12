@@ -93,6 +93,21 @@ impl DecodedFrame {
     pub fn planes(&self) -> (&[u8], &[u8]) {
         self.nv12.split_at((self.width * self.height) as usize)
     }
+
+    /// Convert into the decode→UI handoff frame ([`crate::frame::DecodedFrame`])
+    /// carrying this CPU NV12 payload. Infallible here: the decoder's output is
+    /// already repacked to tightly packed display-size NV12 (see
+    /// `rdp_graphics::yuv::nv12_repack_tight`), which is exactly the layout
+    /// the handoff frame validates.
+    pub fn into_frame(self) -> crate::frame::DecodedFrame {
+        crate::frame::DecodedFrame::from_nv12(
+            self.nv12,
+            self.width,
+            self.height,
+            self.unit_id,
+        )
+        .expect("decoder NV12 output is tightly packed and display-sized")
+    }
 }
 
 const MF_MT_INTERLACE_PROGRESSIVE: u32 = 2;
@@ -554,6 +569,21 @@ pub struct DecodedTexture {
     pub height: u32,
     /// Input-unit tag echoed by the MFT (see [`DecodedFrame::unit_id`]).
     pub unit_id: i64,
+}
+
+impl DecodedTexture {
+    /// Convert into the decode→UI handoff frame ([`crate::frame::DecodedFrame`]),
+    /// *moving* the GPU texture — zero-copy: the pixels never leave the GPU and
+    /// the COM reference just changes hands (the decoder's reuse pool fenced on
+    /// the refcount, so the texture returns to the pool once the UI drops it).
+    pub fn into_frame(self) -> crate::frame::DecodedFrame {
+        crate::frame::DecodedFrame::from_gpu(
+            self.texture,
+            self.width,
+            self.height,
+            self.unit_id,
+        )
+    }
 }
 
 /// A DXVA (GPU) H.264 decoder: the system decoder MFT bound to the caller's

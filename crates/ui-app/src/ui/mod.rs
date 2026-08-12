@@ -19,6 +19,4 @@ pub mod event;
 pub mod window;
 
 pub use event::{WindowEvent, WindowState};
-pub use window::{
-    AppWindow, Frame, HeadlessWindow, NativeWindowHandle, UiError, WindowOptions,
-};
+pub use window::{AppWindow, Frame, HeadlessWindow, NativeWindowHandle, UiError, WindowOptions};

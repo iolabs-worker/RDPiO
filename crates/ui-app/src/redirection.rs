@@ -268,7 +268,13 @@ mod tests {
         };
         let routes = cfg.routes();
         assert!(routes.iter().any(|r| r.kind == DeviceKind::Clipboard));
-        assert_eq!(routes.iter().filter(|r| r.kind == DeviceKind::Drive).count(), 2);
+        assert_eq!(
+            routes
+                .iter()
+                .filter(|r| r.kind == DeviceKind::Drive)
+                .count(),
+            2
+        );
         assert!(routes.iter().any(|r| r.kind == DeviceKind::Printer));
         assert!(routes.iter().any(|r| r.kind == DeviceKind::AudioOutput));
         assert!(routes.iter().any(|r| r.kind == DeviceKind::Microphone));
@@ -281,7 +287,10 @@ mod tests {
             drive_paths: vec!["C:".into(), "C:".into()],
             ..Default::default()
         };
-        assert_eq!(dup.validate(), Err(RedirectionError::DuplicateDrive("C:".into())));
+        assert_eq!(
+            dup.validate(),
+            Err(RedirectionError::DuplicateDrive("C:".into()))
+        );
         let empty = RedirectionConfig {
             drive_paths: vec!["  ".into()],
             ..Default::default()

@@ -18,4 +18,6 @@ pub mod render;
 
 pub use app::{AppController, AppEvent};
 pub use cli::{CliError, CliOptions};
-pub use ui::{AppWindow, Frame, HeadlessWindow, NativeWindowHandle, UiError, WindowEvent, WindowOptions};
+pub use ui::{
+    AppWindow, Frame, HeadlessWindow, NativeWindowHandle, UiError, WindowEvent, WindowOptions,
+};

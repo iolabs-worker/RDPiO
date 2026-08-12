@@ -157,7 +157,7 @@ impl FragmentReassembler {
 /// encrypted (we carry no per-PDU RC4 here — fast-path output is TLS-only) or
 /// the header is malformed.
 pub fn parse_output(pdu: &[u8], frag: &mut FragmentReassembler) -> Option<Vec<FastPathUpdate>> {
-    let b0 = *pdu.get(0)?;
+    let b0 = *pdu.first()?;
     if !is_fastpath_output(b0) {
         return None;
     }

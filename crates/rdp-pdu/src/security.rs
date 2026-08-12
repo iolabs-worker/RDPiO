@@ -165,7 +165,6 @@ pub fn auto_reconnect_cookie(logon_id: u32, security_verifier: &[u8; 16]) -> [u8
 }
 
 /// A `TS_EXTENDED_INFO_PACKET` (the part that follows the `TS_INFO_PACKET`)
-
 /// carrying `performance_flags` and, optionally, the auto-reconnect `cookie`.
 /// With `cookie = None`, `cbAutoReconnectCookie` is 0 and no cookie follows. On
 /// the encrypted legacy path the caller appends this to the `TS_INFO_PACKET`

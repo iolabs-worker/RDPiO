@@ -111,9 +111,7 @@ impl WindowState {
                 self.height = height;
                 self.pending_resize = Some((width, height));
             }
-            WindowEvent::Keyboard {
-                scancode, down, ..
-            } => {
+            WindowEvent::Keyboard { scancode, down, .. } => {
                 if down {
                     self.keys_down.insert(scancode);
                 } else {
@@ -144,12 +142,9 @@ pub fn to_input_events(event: &WindowEvent) -> Vec<InputEvent> {
             input::key_release(scancode, extended)
         }],
         WindowEvent::MouseMove { x, y } => vec![input::mouse_move(clamp(x), clamp(y))],
-        WindowEvent::MouseButton {
-            button,
-            x,
-            y,
-            down,
-        } => vec![input::mouse_button(button, down, clamp(x), clamp(y))],
+        WindowEvent::MouseButton { button, x, y, down } => {
+            vec![input::mouse_button(button, down, clamp(x), clamp(y))]
+        }
         WindowEvent::MouseWheel { delta, x, y } => {
             let direction = if delta >= 0 {
                 WheelDirection::Up
@@ -303,12 +298,8 @@ mod tests {
         });
         match (&up[0], &down[0]) {
             (
-                InputEvent::ExtendedMouse {
-                    flags: up_f, ..
-                },
-                InputEvent::ExtendedMouse {
-                    flags: down_f, ..
-                },
+                InputEvent::ExtendedMouse { flags: up_f, .. },
+                InputEvent::ExtendedMouse { flags: down_f, .. },
             ) => {
                 assert_eq!(*up_f, ptr::WHEEL);
                 assert_eq!(*down_f, ptr::WHEEL | 0x0100); // PTRFLAGS_WHEEL_NEGATIVE

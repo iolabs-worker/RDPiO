@@ -13,10 +13,10 @@ use windows::Win32::Graphics::Direct3D::{
     D3D_DRIVER_TYPE_HARDWARE, D3D_FEATURE_LEVEL_11_0, D3D_FEATURE_LEVEL_9_3,
 };
 use windows::Win32::Graphics::Direct3D11::{
-    D3D11CreateDevice, ID3D11Device, ID3D11DeviceContext, ID3D11RenderTargetView,
-    ID3D11Texture2D, D3D11_BIND_RENDER_TARGET, D3D11_CREATE_DEVICE_BGRA_SUPPORT,
-    D3D11_RENDER_TARGET_VIEW_DESC, D3D11_RENDER_TARGET_VIEW_DESC_0, D3D11_RTV_DIMENSION_TEXTURE2D,
-    D3D11_SDK_VERSION, D3D11_TEX2D_RTV, D3D11_TEXTURE2D_DESC, D3D11_USAGE_DEFAULT,
+    D3D11CreateDevice, ID3D11Device, ID3D11DeviceContext, ID3D11RenderTargetView, ID3D11Texture2D,
+    D3D11_BIND_RENDER_TARGET, D3D11_CREATE_DEVICE_BGRA_SUPPORT, D3D11_RENDER_TARGET_VIEW_DESC,
+    D3D11_RENDER_TARGET_VIEW_DESC_0, D3D11_RTV_DIMENSION_TEXTURE2D, D3D11_SDK_VERSION,
+    D3D11_TEX2D_RTV, D3D11_TEXTURE2D_DESC, D3D11_USAGE_DEFAULT,
 };
 use windows::Win32::Graphics::Dxgi::Common::{
     DXGI_ALPHA_MODE_UNSPECIFIED, DXGI_FORMAT_B8G8R8A8_UNORM, DXGI_SAMPLE_DESC,
@@ -103,7 +103,8 @@ impl Renderer {
             Flags: 0,
         };
         let factory: IDXGIFactory2 = unsafe { CreateDXGIFactory1()? };
-        let swapchain = unsafe { factory.CreateSwapChainForHwnd(&device, hwnd, &desc, None, None)? };
+        let swapchain =
+            unsafe { factory.CreateSwapChainForHwnd(&device, hwnd, &desc, None, None)? };
 
         let backbuffer: ID3D11Texture2D = unsafe { swapchain.GetBuffer(0)? };
         let rtv = unsafe { device.CreateRenderTargetView(&backbuffer, Some(&rtv_desc()))? };
@@ -125,7 +126,8 @@ impl Renderer {
         unsafe {
             self.context
                 .OMSetRenderTargets(Some(&[Some(self.rtv.clone())]), None);
-            self.context.ClearRenderTargetView(&self.rtv, &[0.0, 0.0, 0.0, 1.0]);
+            self.context
+                .ClearRenderTargetView(&self.rtv, &[0.0, 0.0, 0.0, 1.0]);
         }
         if let Some(frame) = frame {
             self.upload_frame(frame)?;
@@ -141,11 +143,19 @@ impl Renderer {
         self.width = width.max(1);
         self.height = height.max(1);
         unsafe {
-            self.swapchain
-                .ResizeBuffers(0, self.width, self.height, DXGI_FORMAT_B8G8R8A8_UNORM, 0)?;
+            self.swapchain.ResizeBuffers(
+                0,
+                self.width,
+                self.height,
+                DXGI_FORMAT_B8G8R8A8_UNORM,
+                0,
+            )?;
         }
         let backbuffer: ID3D11Texture2D = unsafe { self.swapchain.GetBuffer(0)? };
-        self.rtv = unsafe { self.device.CreateRenderTargetView(&backbuffer, Some(&rtv_desc()))? };
+        self.rtv = unsafe {
+            self.device
+                .CreateRenderTargetView(&backbuffer, Some(&rtv_desc()))?
+        };
         self.frame_texture = None;
         self.frame_size = None;
         Ok(())

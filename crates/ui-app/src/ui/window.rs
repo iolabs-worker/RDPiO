@@ -189,14 +189,10 @@ impl AppWindow for HeadlessWindow {
         }
         // The most recent resize event wins; the UI loop applies it and the
         // caller drains the events with `drain_events`.
-        let resize = self
-            .events
-            .iter()
-            .rev()
-            .find_map(|ev| match ev {
-                WindowEvent::Resized { width, height } => Some((*width, *height)),
-                _ => None,
-            });
+        let resize = self.events.iter().rev().find_map(|ev| match ev {
+            WindowEvent::Resized { width, height } => Some((*width, *height)),
+            _ => None,
+        });
         Frame::Continue { resize }
     }
 

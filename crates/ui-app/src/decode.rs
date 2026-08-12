@@ -274,19 +274,13 @@ pub fn parse_sps(sps_nal: &[u8]) -> Option<H264Config> {
     let _direct_8x8_inference = r.read_bit()?;
     let frame_cropping_flag = r.read_bit()?;
     let (crop_left, crop_right, crop_top, crop_bottom) = if frame_cropping_flag == 1 {
-        (
-            r.read_ue()?,
-            r.read_ue()?,
-            r.read_ue()?,
-            r.read_ue()?,
-        )
+        (r.read_ue()?, r.read_ue()?, r.read_ue()?, r.read_ue()?)
     } else {
         (0, 0, 0, 0)
     };
 
     let mut width = (pic_width_in_mbs_minus1 + 1) * 16;
-    let mut height =
-        (2 - frame_mbs_only_flag as u32) * (pic_height_in_map_units_minus1 + 1) * 16;
+    let mut height = (2 - frame_mbs_only_flag as u32) * (pic_height_in_map_units_minus1 + 1) * 16;
     // 4:2:0 chroma cropping units (chroma_format_idc == 1 default).
     let crop_unit_x = 2u32;
     let crop_unit_y = 2 * (2 - frame_mbs_only_flag as u32);
@@ -315,7 +309,11 @@ fn read_scaling_list(r: &mut BitReader<'_>, size: usize) -> Option<()> {
             let delta = r.read_se()?;
             next_scale = (last_scale + delta + 256) % 256;
         }
-        last_scale = if next_scale == 0 { last_scale } else { next_scale };
+        last_scale = if next_scale == 0 {
+            last_scale
+        } else {
+            next_scale
+        };
     }
     Some(())
 }

@@ -5,21 +5,19 @@
 //! submitted as `COMPRESSED_BITSTREAM` buffers; decoded frames land in an
 //! output view backed by a `D3D11_BIND_DECODER` NV12 texture.
 
-use super::{AccessUnit, H264Config, to_avcc};
+use super::{to_avcc, AccessUnit, H264Config};
 use windows::core::{Error, Interface, Result};
 use windows::Win32::Foundation::{E_FAIL, E_NOTIMPL};
 use windows::Win32::Graphics::Direct3D::{
     D3D_DRIVER_TYPE_HARDWARE, D3D_FEATURE_LEVEL_11_0, D3D_FEATURE_LEVEL_9_3,
 };
 use windows::Win32::Graphics::Direct3D11::{
-    D3D11CreateDevice, ID3D11Device, ID3D11DeviceContext, ID3D11Texture2D,
-    ID3D11VideoContext, ID3D11VideoDecoder, ID3D11VideoDecoderOutputView,
-    ID3D11VideoDevice, D3D11_BIND_DECODER, D3D11_CREATE_DEVICE_BGRA_SUPPORT,
-    D3D11_TEXTURE2D_DESC, D3D11_USAGE_DEFAULT, D3D11_VIDEO_DECODER_BUFFER_DESC,
-    D3D11_VIDEO_DECODER_BUFFER_TYPE_COMPRESSED_BITSTREAM, D3D11_VIDEO_DECODER_DESC,
-    D3D11_VIDEO_DECODER_OUTPUT_VIEW_DESC,
-    D3D11_VIDEO_DECODER_OUTPUT_VIEW_DIMENSION_TEXTURE2D,
-    D3D11_VIDEO_DECODER_OUTPUT_VIEW_TEXTURE2D, D3D11_SDK_VERSION,
+    D3D11CreateDevice, ID3D11Device, ID3D11DeviceContext, ID3D11Texture2D, ID3D11VideoContext,
+    ID3D11VideoDecoder, ID3D11VideoDecoderOutputView, ID3D11VideoDevice, D3D11_BIND_DECODER,
+    D3D11_CREATE_DEVICE_BGRA_SUPPORT, D3D11_SDK_VERSION, D3D11_TEXTURE2D_DESC, D3D11_USAGE_DEFAULT,
+    D3D11_VIDEO_DECODER_BUFFER_DESC, D3D11_VIDEO_DECODER_BUFFER_TYPE_COMPRESSED_BITSTREAM,
+    D3D11_VIDEO_DECODER_DESC, D3D11_VIDEO_DECODER_OUTPUT_VIEW_DESC,
+    D3D11_VIDEO_DECODER_OUTPUT_VIEW_DIMENSION_TEXTURE2D, D3D11_VIDEO_DECODER_OUTPUT_VIEW_TEXTURE2D,
 };
 use windows::Win32::Graphics::Dxgi::Common::DXGI_FORMAT_NV12;
 use windows::Win32::Graphics::Dxgi::DXGI_SAMPLE_DESC;
@@ -129,7 +127,7 @@ impl VideoDecoder {
                 &mut size,
                 &mut buffer,
             )?;
-            if size as usize < bitstream.len() {
+            if (size as usize) < bitstream.len() {
                 return Err(Error::from_hresult(E_NOTIMPL));
             }
             std::ptr::copy_nonoverlapping(bitstream.as_ptr(), buffer as *mut u8, bitstream.len());

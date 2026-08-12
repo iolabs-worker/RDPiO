@@ -1203,6 +1203,12 @@ mod crash;
 #[cfg(windows)]
 mod window;
 
+// Client UI: the native Windows top-level window (`ui::UiWindow`) plus the
+// platform-neutral run-loop event types. The window itself is `#[cfg(windows)]`
+// inside the module, so Linux keeps building headless while the pure event/size
+// logic stays unit-testable everywhere.
+mod ui;
+
 #[cfg(windows)]
 mod connbar;
 
@@ -2927,20 +2933,20 @@ mod win {
     }
 
     /// The no-host demo window (slate background): launched without `--host`.
+    /// The window is created through the client's `ui` module, which owns the
+    /// Win32 top-level window and its D3D11 swapchain.
     pub fn run() -> Result<(), Box<dyn std::error::Error>> {
         let (width, height) = (1280u32, 720u32);
-        let window = Window::new("RDPiO", width, height)?;
-        let mut renderer = Renderer::new(window.hwnd_raw(), width, height, rdp_gpu::Backend::default())?;
+        let mut ui = crate::ui::UiWindow::new("RDPiO", width, height)?;
         tracing::info!("M0 window + D3D11 swapchain up; entering message loop");
 
         loop {
-            match window.pump() {
-                Frame::Quit => break,
-                Frame::Continue { resize } => {
-                    if let Some((w, h)) = resize {
-                        renderer.resize(w, h)?;
-                    }
-                    renderer.present_clear(SLATE)?;
+            match ui.handle_events()? {
+                crate::ui::UiEvent::Quit => break,
+                crate::ui::UiEvent::Continue { .. } => {
+                    // `handle_events` already applied any pending resize to the
+                    // swapchain; just repaint the idle slate.
+                    ui.present_clear(SLATE)?;
                 }
             }
         }

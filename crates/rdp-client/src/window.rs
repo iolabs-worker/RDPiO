@@ -380,6 +380,35 @@ impl Window {
         }
     }
 
+    /// Resize the window to `width`×`height` pixels, keeping the top-left
+    /// corner where it is. The swapchain resize is the caller's job (see
+    /// [`crate::ui::UiWindow::set_size`]); this only moves the native window.
+    pub fn set_size(&self, width: u32, height: u32) -> windows::core::Result<()> {
+        unsafe {
+            // SWP_NOMOVE keeps the current position, SWP_NOZORDER keeps the
+            // z-order, SWP_NOACTIVATE avoids stealing focus on a resize.
+            SetWindowPos(
+                self.hwnd,
+                None,
+                0,
+                0,
+                width.max(1) as i32,
+                height.max(1) as i32,
+                SWP_NOMOVE | SWP_NOZORDER | SWP_NOACTIVATE,
+            )?;
+        }
+        Ok(())
+    }
+
+    /// Ask the window to close: post `WM_CLOSE`, which the default window
+    /// procedure answers with `DestroyWindow` → `WM_DESTROY` →
+    /// `PostQuitMessage`, so the next [`Window::pump`] reports `Frame::Quit`.
+    pub fn request_close(&self) {
+        unsafe {
+            let _ = PostMessageW(Some(self.hwnd), WM_CLOSE, WPARAM(0), LPARAM(0));
+        }
+    }
+
     /// Drain all pending messages without blocking, returning whether to keep
     /// running and any resize to apply before the next present.
     /// Block until there is something to do: a frame queued by the session

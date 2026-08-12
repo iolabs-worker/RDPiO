@@ -24,6 +24,7 @@ use crate::transport::read_tpkt_pdu;
 /// Bounds how long a saturated UDP stream can defer TCP input / clipboard service
 /// before the loop cycles back — high enough that several full frames' worth of
 /// PDUs clear per pass, low enough to keep input responsive under a graphics flood.
+#[cfg_attr(not(windows), allow(dead_code))] // drain budget used by the Windows UDP session loop
 const UDP_DRAIN_BUDGET: u32 = 256;
 
 /// Set by the platform when the *local* clipboard changes (so we re-advertise it
@@ -241,6 +242,7 @@ fn note_server_input_flags(share_pdu: &[u8]) {
 
 /// Whether the server supports TS_RELPOINTER_EVENT relative mouse input
 /// (INPUT_FLAG_MOUSE_RELATIVE in its Demand Active input caps).
+#[cfg_attr(not(windows), allow(dead_code))] // relative-mouse capability probe used by the Windows input path
 pub(crate) fn rel_mouse_supported() -> bool {
     SERVER_INPUT_FLAGS.load(Ordering::SeqCst)
         & rdp_pdu::capabilities::INPUT_FLAG_MOUSE_RELATIVE as u32
@@ -256,7 +258,7 @@ pub enum ActivateError {
     #[error("activation error: {0}")]
     Protocol(String),
     #[error("server redirection: {0:?}")]
-    Redirect(rdp_pdu::redirection::ServerRedirection),
+    Redirect(Box<rdp_pdu::redirection::ServerRedirection>),
 }
 
 /// Identifiers describing the live session once activation completes.
@@ -870,6 +872,7 @@ struct RdpdrState {
     reasm: rdp_channels::svc::Reassembler,
 }
 
+#[cfg_attr(not(windows), allow(dead_code))] // several methods here are consumed only by the Windows session loop
 impl ActiveSession {
     pub fn info(&self) -> &SessionInfo {
         &self.info
@@ -1324,6 +1327,7 @@ pub struct InputSender<S: Write> {
     share_id: u32,
 }
 
+#[cfg_attr(not(windows), allow(dead_code))] // input batching sender used by the Windows UI thread
 impl<S: Write> InputSender<S> {
     /// Frame and send a batch of input events. A no-op for an empty batch.
     pub fn send(&mut self, events: &[rdp_pdu::input::EventBytes]) -> Result<(), ActivateError> {
@@ -1370,6 +1374,7 @@ pub enum CursorUpdate {
 
 /// A consumer of decoded screen rectangles (implemented by the GPU renderer on
 /// Windows, or a logging/test sink elsewhere).
+#[cfg_attr(not(windows), allow(dead_code))] // blit_owned is used only by the Windows D3D11 sink
 pub trait FrameSink {
     /// Blit a `w`x`h` RGBA8 rectangle to (`x`,`y`) on the framebuffer.
     fn blit(&mut self, x: u16, y: u16, w: u16, h: u16, rgba: &[u8]);
@@ -2818,7 +2823,7 @@ fn recv_demand_active<S: Read + Write>(
 
         // AVD / RDS broker redirection arrives instead of Demand Active.
         if let Some(redir) = rdp_pdu::redirection::parse(&plaintext) {
-            return Err(ActivateError::Redirect(redir));
+            return Err(ActivateError::Redirect(Box::new(redir)));
         }
 
         // Demand Active ends the wait (and the licensing phase).

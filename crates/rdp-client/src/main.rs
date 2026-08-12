@@ -1075,15 +1075,12 @@ Requires a CPU with AVX2 (Intel Haswell / AMD Excavator, 2013 or newer)."#,
 }
 
 fn parse_backend(v: &str) -> rdp_gpu::Backend {
-    match v.trim().to_ascii_lowercase().as_str() {
+    let v = v.trim().to_ascii_lowercase();
+    match v.as_str() {
         "d3d12" | "dx12" | "12" => rdp_gpu::Backend::D3D12,
-        "d3d11" | "dx11" | "11" | _ => {
-            if !matches!(
-                v.trim().to_ascii_lowercase().as_str(),
-                "d3d11" | "dx11" | "11"
-            ) {
-                tracing::warn!("unknown --backend mode {v:?}; using d3d11");
-            }
+        "d3d11" | "dx11" | "11" => rdp_gpu::Backend::D3D11,
+        _ => {
+            tracing::warn!("unknown --backend mode {v:?}; using d3d11");
             rdp_gpu::Backend::D3D11
         }
     }

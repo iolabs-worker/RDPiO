@@ -461,8 +461,7 @@ impl TurnClient {
                 if self.follow_alternate(&resp)? {
                     continue;
                 }
-                return Err(io::Error::new(
-                    ErrorKind::Other,
+                return Err(io::Error::other(
                     "300 Try Alternate without an ALTERNATE-SERVER address",
                 ));
             }
@@ -514,8 +513,7 @@ impl TurnClient {
                             redirected = true;
                             break; // re-enter outer loop against the new server
                         }
-                        return Err(io::Error::new(
-                            ErrorKind::Other,
+                        return Err(io::Error::other(
                             "300 Try Alternate without an ALTERNATE-SERVER address",
                         ));
                     }
@@ -532,8 +530,7 @@ impl TurnClient {
                 break;
             }
         }
-        Err(io::Error::new(
-            ErrorKind::Other,
+        Err(io::Error::other(
             "TURN Allocate failed (exhausted redirects)",
         ))
     }
@@ -556,8 +553,7 @@ impl TurnClient {
                 if self.follow_alternate(&resp)? {
                     continue;
                 }
-                return Err(io::Error::new(
-                    ErrorKind::Other,
+                return Err(io::Error::other(
                     "300 Try Alternate without an ALTERNATE-SERVER address",
                 ));
             }

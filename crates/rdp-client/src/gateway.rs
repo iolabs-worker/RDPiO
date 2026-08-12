@@ -59,8 +59,10 @@ pub fn parse_rdp_settings(
     if hostname.is_empty() {
         return None;
     }
-    let mut cfg = GatewayConfig::default();
-    cfg.hostname = hostname.clone();
+    let mut cfg = GatewayConfig {
+        hostname: hostname.clone(),
+        ..GatewayConfig::default()
+    };
     if let Some(p) = settings.get("gatewayport").and_then(|s| s.parse().ok()) {
         cfg.port = p;
     }

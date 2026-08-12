@@ -199,3 +199,23 @@ impl Renderer {
         Ok(())
     }
 }
+
+impl crate::decode::sink::FrameSink for Renderer {
+    type Error = RenderError;
+
+    fn present(&mut self, frame: crate::decode::DecodedFrame) -> Result<(), Self::Error> {
+        let rgba = RgbaFrame {
+            pixels: match frame.payload {
+                crate::decode::FramePayload::Bgra8(pixels) => pixels,
+            },
+            width: frame.width,
+            height: frame.height,
+        };
+        self.present(Some(&rgba))?;
+        Ok(())
+    }
+
+    fn size(&self) -> (u32, u32) {
+        self.size()
+    }
+}

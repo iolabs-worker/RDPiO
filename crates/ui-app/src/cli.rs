@@ -70,6 +70,8 @@ pub enum CliError {
     UnknownFlag(String),
     /// `--port` was not a valid port number.
     BadPort(String),
+    /// `--width`/`--height` was not a valid number.
+    BadNumber(String),
     /// No `--host` was given.
     MissingHost,
     /// `--help`/`-h` was requested.

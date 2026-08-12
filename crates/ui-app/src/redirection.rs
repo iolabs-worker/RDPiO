@@ -8,7 +8,7 @@
 //! lives in the workspace's `rdp-channels` crate; this module only decides
 //! what to open and where to route bytes.
 
-use wire_main::ChannelPurpose;
+use wire_main::{ChannelPurpose, WireError};
 
 /// Clipboard redirection static channel.
 pub const CLIPBOARD_CHANNEL: &str = "cliprdr";
@@ -75,6 +75,12 @@ impl std::fmt::Display for RedirectionError {
 }
 
 impl std::error::Error for RedirectionError {}
+
+impl From<RedirectionError> for WireError {
+    fn from(e: RedirectionError) -> Self {
+        WireError::Protocol(e.to_string())
+    }
+}
 
 impl RedirectionConfig {
     /// Whether drive/printer redirection (rdpdr) is requested at all.

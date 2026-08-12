@@ -11,8 +11,10 @@
 //!   transport state, and exits cleanly, keeping the whole binary buildable
 //!   and runnable in CI without a display.
 
-mod app;
-mod cli;
+// The binary is a thin front-end over the `ui_app` library target: parsing,
+// the controller, and the pure-logic helpers live in the library so they are
+// unit-testable without a window or a GPU.
+use ui_app::{app, cli};
 
 #[cfg(windows)]
 mod win;

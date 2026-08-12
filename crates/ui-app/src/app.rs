@@ -16,7 +16,7 @@
 use crate::cli::CliOptions;
 use crate::redirection::RedirectionConfig;
 use wire_main::{
-    ConnectOptions, InputEvent, ServerPdu, WireError, WireResult, WireSession,
+    ConnectOptions, InputEvent, ServerPdu, WireError, WireResult, WireSession, WireTransport,
 };
 
 /// Events surfaced by [`AppController::poll`].
@@ -86,6 +86,11 @@ impl AppController {
     /// The negotiated session settings, once connected.
     pub fn settings(&self) -> Option<&wire_main::SessionSettings> {
         self.session.as_ref().map(|s| s.settings())
+    }
+
+    /// Access to the underlying transport (peer address, UDP side-band).
+    pub fn transport(&mut self) -> Option<&mut WireTransport> {
+        self.session.as_mut().map(|s| s.transport())
     }
 
     /// Open the connection. Returns `Ok` only after the full RDP connection

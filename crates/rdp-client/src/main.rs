@@ -351,15 +351,17 @@ struct MonitorPlacement {
 /// translating the bounding-box origin to desktop (0,0), which is exactly the
 /// subtraction used for the slice origins here, so EGFX surface offsets land
 /// on the same coordinates.
-#[allow(dead_code)] // used by the Windows multi-monitor layout path and unit tests
-fn scale_monitor_layout(
-    rects: &[rdp_pdu::gcc::VirtualScreenRect],
-    scale: f32,
-) -> (
+/// Scaled multi-monitor layout: the monitor defs to advertise, the scaled
+/// desktop size, and each monitor's framebuffer slice ((origin), (size)).
+#[cfg_attr(not(windows), allow(dead_code))] // used by the Windows multi-monitor layout path
+type MonitorLayout = (
     Vec<rdp_pdu::gcc::MonitorDef>,
     (u32, u32),
     Vec<((u32, u32), (u32, u32))>,
-) {
+);
+
+#[allow(dead_code)] // used by the Windows multi-monitor layout path and unit tests
+fn scale_monitor_layout(rects: &[rdp_pdu::gcc::VirtualScreenRect], scale: f32) -> MonitorLayout {
     let scale = scale.clamp(0.4, 1.0) as f64;
     let e = |v: i32| -> i32 { (((v as f64) * scale / 2.0).round() as i32) * 2 };
     let scaled: Vec<(i32, i32, i32, i32, bool)> = rects
@@ -515,20 +517,15 @@ fn run_connect(args: &Args) -> Result<(), transport::NegotiateError> {
 /// bicubic upscaler; gaming permits render-scale and motion-first choices.
 /// Full 4:4:4 remains available explicitly via `--force-avc444`, whose chroma
 /// reconstruction runs on the CPU decode path.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
 enum QualityPreset {
     /// Motion-first: render-scale friendly, upscaler tuned for game imagery.
     Gaming,
     /// Clarity-first: no render-scale, smooth vsync, bicubic.
     Office,
     /// The defaults (identical codec caps; see the enum docs).
+    #[default]
     Balanced,
-}
-
-impl Default for QualityPreset {
-    fn default() -> Self {
-        QualityPreset::Balanced
-    }
 }
 
 /// Minimal command-line arguments (no external arg-parsing dependency).

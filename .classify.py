@@ -1,0 +1,13 @@
+s = open('/tmp/clippy3.log', 'rb').read().decode('utf-8', 'replace')
+lines = s.splitlines()
+errs = [l for l in lines if l.startswith('error')]
+n_rustc = sum(1 for l in errs if l.startswith('error['))
+n_could = sum(1 for l in errs if 'could not compile' in l)
+n_const = sum(1 for l in errs if 'never used' in l or 'never constructed' in l or 'never read' in l)
+n_large = sum(1 for l in errs if 'very large' in l or 'large size difference' in l)
+n_other = sum(1 for l in errs if not (l.startswith('error[') or 'could not compile' in l or 'never used' in l or 'never constructed' in l or 'never read' in l or 'very large' in l or 'large size difference' in l))
+print('A' * n_rustc)
+print('B' * n_could)
+print('C' * n_const)
+print('D' * n_large)
+print('E' * n_other)

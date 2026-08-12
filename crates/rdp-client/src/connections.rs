@@ -96,11 +96,13 @@ impl ConnectionProfile {
 /// current user; `load_from(path)` is available for tests and embedders that
 /// want to point the store at a specific file.
 #[derive(Debug, Clone)]
+#[cfg_attr(not(windows), allow(dead_code))] // persisted-connection store used by the Windows saved-connection UI
 pub struct ConnectionStore {
     path: PathBuf,
     profiles: Vec<ConnectionProfile>,
 }
 
+#[cfg_attr(not(windows), allow(dead_code))] // store methods used by the Windows saved-connection UI
 impl ConnectionStore {
     /// Load the store from the user data directory (or the temp-dir fallback).
     pub fn load() -> Self {
@@ -224,6 +226,7 @@ impl ConnectionStore {
 
 /// The well-known store location: the user data dir for
 /// `com.IOServicesLabs.RDPiO`, else the temp-dir fallback.
+#[cfg_attr(not(windows), allow(dead_code))] // store persistence path used by the Windows saved-connection UI
 fn default_store_path() -> PathBuf {
     match directories::ProjectDirs::from("com", "IOServicesLabs", "RDPiO") {
         Some(dirs) => dirs.data_dir().join("connections.json"),
@@ -232,6 +235,7 @@ fn default_store_path() -> PathBuf {
 }
 
 /// `<file>` → `<file>.corrupt`, used to quarantine unreadable stores.
+#[cfg_attr(not(windows), allow(dead_code))] // store recovery helper used by the Windows saved-connection UI
 fn corrupt_path(path: &Path) -> PathBuf {
     let mut name = path.as_os_str().to_owned();
     name.push(".corrupt");

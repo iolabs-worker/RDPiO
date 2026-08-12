@@ -565,7 +565,7 @@ impl TurnClient {
             // terminates the redirect chain: it's the backend to target.
             return Ok(self.server);
         }
-        Err(io::Error::new(ErrorKind::Other, "exhausted TURN redirects"))
+        Err(io::Error::other("exhausted TURN redirects"))
     }
 
     /// Follow a `300 Try Alternate`: point `self.server` at the `ALTERNATE-SERVER`

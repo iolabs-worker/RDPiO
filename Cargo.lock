@@ -3664,6 +3664,7 @@ name = "rdp-webrtc"
 version = "0.0.1"
 dependencies = [
  "bytes",
+ "rustls",
  "serde",
  "serde_json",
  "thiserror 1.0.69",

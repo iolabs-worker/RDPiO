@@ -175,6 +175,17 @@ impl WebrtcEngine {
     /// `RTCPeerConnection.createPeerConnection` — build the peer connection with
     /// default codecs/interceptors and the session's ICE servers.
     pub async fn create_peer_connection(&mut self, config: &Value) -> Result<()> {
+        // rustls 0.23 needs a process-level CryptoProvider before any DTLS
+        // handshake (webrtc-rs's `dtls` crate builds its rustls configs from the
+        // process default). The workspace compiles BOTH rustls providers —
+        // `aws_lc_rs` via rdp-client's default-features rustls dependency, `ring`
+        // via dtls — so rustls cannot auto-select one and would panic at the
+        // first handshake unless we install one explicitly here. ring is what
+        // webrtc-rs/dtls already use, so it's the natural default. `install_default`
+        // only succeeds once per process; a later Err just means it's already set,
+        // which is exactly what we want.
+        let _ = rustls::crypto::ring::default_provider().install_default();
+
         // A session may build several peer connections in turn (Teams tears one
         // down and retries). Start each from clean state so stale transceivers /
         // data channels / candidates from the previous one can't leak into it.

@@ -122,7 +122,10 @@ fn mcs_attach_user_confirm_parse_and_roundtrip() {
     // Round trip: encode user id 1001 back to wire form and re-parse.
     let mut round = vec![0x2c, 0x00];
     round.extend_from_slice(&1001u16.to_be_bytes());
-    assert_eq!(mcs::parse_attach_user_confirm(&round).unwrap().user_id, 1001);
+    assert_eq!(
+        mcs::parse_attach_user_confirm(&round).unwrap().user_id,
+        1001
+    );
 }
 
 #[test]
@@ -133,7 +136,9 @@ fn mcs_channel_join_roundtrip() {
     // The confirm echoes the channel id in the last two bytes.
     let confirm = [0x3e, 0x00, 0x03, 0xe9, 0x03, 0xeb, 0x03, 0xeb];
     assert_eq!(
-        mcs::parse_channel_join_confirm(&confirm).unwrap().channel_id,
+        mcs::parse_channel_join_confirm(&confirm)
+            .unwrap()
+            .channel_id,
         1003
     );
 }
@@ -160,10 +165,7 @@ fn security_exchange_header_layout_matches_spec() {
     // Basic Security Header: flags = SEC_EXCHANGE_PKT (0x0001), flagsHi = 0.
     assert_eq!(&pdu[0..4], &[0x01, 0x00, 0x00, 0x00]);
     // Then the length of the encrypted random (LE), then the blob.
-    assert_eq!(
-        u32::from_le_bytes([pdu[4], pdu[5], pdu[6], pdu[7]]),
-        72
-    );
+    assert_eq!(u32::from_le_bytes([pdu[4], pdu[5], pdu[6], pdu[7]]), 72);
     assert_eq!(&pdu[8..], &encrypted_random[..]);
 }
 
@@ -203,7 +205,12 @@ fn build_demand_active(share_id: u32, caps_bytes: &[u8], num_caps: u16) -> Vec<u
     body.extend_from_slice(&0u32.to_le_bytes()); // sessionId
 
     let mut demand = Vec::new();
-    caps::write_share_control_header(caps::PDUTYPE_DEMAND_ACTIVE, 1002, 12 + body.len(), &mut demand);
+    caps::write_share_control_header(
+        caps::PDUTYPE_DEMAND_ACTIVE,
+        1002,
+        12 + body.len(),
+        &mut demand,
+    );
     caps::write_share_data_header(share_id, 0x11, body.len(), &mut demand);
     demand.extend_from_slice(&body);
     demand
@@ -320,7 +327,10 @@ fn bitmap_update_pdu_encode_roundtrip_reproduces_fixture() {
         "totalLength covers the whole PDU"
     );
     // pduType = PDUTYPE_DATA | PROTOCOL_VERSION (0x10).
-    assert_eq!(u16::from_le_bytes([pdu[2], pdu[3]]) & 0x0f, caps::PDUTYPE_DATA);
+    assert_eq!(
+        u16::from_le_bytes([pdu[2], pdu[3]]) & 0x0f,
+        caps::PDUTYPE_DATA
+    );
 
     // Parse it back: the update body is the exact tail.
     let mut cur: &[u8] = &pdu;

@@ -10,6 +10,7 @@ members = [
     "crates/rdp-graphics",
     "crates/rdp-gpu",
     "crates/rdp-client",
+    "crates/rdpio",
     "crates/rdp-webrtc",
     "crates/wire-main",
     "crates/ui-app",
@@ -33,6 +34,9 @@ rdp-nla = { path = "crates/rdp-nla", version = "0.0.1" }
 rdp-channels = { path = "crates/rdp-channels", version = "0.0.1" }
 rdp-graphics = { path = "crates/rdp-graphics", version = "0.0.1" }
 rdp-gpu = { path = "crates/rdp-gpu", version = "0.0.1" }
+rdp-client = { path = "crates/rdp-client", version = "0.0.1" }
+rdpio = { path = "crates/rdpio", version = "0.0.1" }
+rdp-webrtc = { path = "crates/rdp-webrtc", version = "0.0.1" }
 wire-main = { path = "crates/wire-main", version = "0.0.1" }
 ui-app = { path = "crates/ui-app", version = "0.0.1" }
 

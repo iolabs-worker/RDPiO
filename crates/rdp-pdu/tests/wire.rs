@@ -12,8 +12,7 @@ use rdp_pdu::fastpath::{self, FragmentReassembler};
 use rdp_pdu::mcs;
 use rdp_pdu::security;
 use rdp_pdu::x224::{
-    self, ConnectionConfirm, ConnectionRequest, NegFailureCode, NegResponseFlags,
-    SecurityProtocol,
+    self, ConnectionConfirm, ConnectionRequest, NegFailureCode, NegResponseFlags, SecurityProtocol,
 };
 
 // ---------------------------------------------------------------------------
@@ -31,7 +30,8 @@ const X224_CR_FIXTURE: [u8; 19] = [
     0x00, 0x00, // DST-REF
     0x00, 0x00, // SRC-REF
     0x00, // class/options
-    0x01, 0x00, 0x08, 0x00, 0x03, 0x00, 0x00, 0x00, // RDP_NEG_REQ type=1, flags=0, len=8, proto=3
+    0x01, 0x00, 0x08, 0x00, 0x03, 0x00, 0x00,
+    0x00, // RDP_NEG_REQ type=1, flags=0, len=8, proto=3
 ];
 
 #[test]
@@ -107,7 +107,9 @@ fn x224_connection_confirm_negotiation_failure() {
 fn x224_connection_confirm_legacy_no_negotiation() {
     // A pre-negotiation server replies with a bare CC: the length indicator
     // equals the fixed CR/CC header size, so no RDP_NEG structure follows.
-    let fixture: [u8; 11] = [0x03, 0x00, 0x00, 0x0b, 0x06, 0xd0, 0x00, 0x00, 0x12, 0x34, 0x00];
+    let fixture: [u8; 11] = [
+        0x03, 0x00, 0x00, 0x0b, 0x06, 0xd0, 0x00, 0x00, 0x12, 0x34, 0x00,
+    ];
     let mut cur: &[u8] = &fixture;
     let parsed = ConnectionConfirm::decode(&mut cur).unwrap();
     assert_eq!(parsed, ConnectionConfirm::NoNegotiation);
@@ -182,10 +184,7 @@ fn security_exchange_header_layout_matches_spec() {
     // Basic Security Header: flags = SEC_EXCHANGE_PKT (0x0001), flagsHi = 0.
     assert_eq!(&pdu[0..4], &[0x01, 0x00, 0x00, 0x00]);
     // Then the length of the encrypted random (LE), then the blob.
-    assert_eq!(
-        u32::from_le_bytes([pdu[4], pdu[5], pdu[6], pdu[7]]),
-        72
-    );
+    assert_eq!(u32::from_le_bytes([pdu[4], pdu[5], pdu[6], pdu[7]]), 72);
     assert_eq!(&pdu[8..], &encrypted_random[..]);
 }
 
@@ -246,7 +245,10 @@ fn demand_active_parse_and_confirm_active_roundtrip() {
     // One minimal General capability set (type 1, 20 payload bytes).
     let sets = vec![(1u16, vec![0u8; 20])];
     let demand = build_demand_active(share_id, &sets);
-    assert_eq!(capabilities::parse_demand_active(&demand).unwrap(), share_id);
+    assert_eq!(
+        capabilities::parse_demand_active(&demand).unwrap(),
+        share_id
+    );
 
     // The client answers with a Confirm Active echoing the same share id.
     let confirm = capabilities::confirm_active(share_id, 1007, 1280, 800, 0x0409, false);
@@ -272,17 +274,20 @@ fn demand_active_with_rfx_caps_parses_share_id() {
     // 8 capability sets (the RemoteFX-enabled client advertises
     // Surface Commands + Bitmap Codecs on top of the 6 base sets).
     let mut sets: Vec<(u16, Vec<u8>)> = vec![
-        (1, vec![0u8; 20]),  // General
-        (2, vec![0u8; 24]),  // Bitmap
-        (3, vec![0u8; 84]),  // Order
-        (8, vec![0u8; 6]),   // Pointer
-        (13, vec![0u8; 88]), // Input
-        (20, vec![0u8; 4]),  // Virtual Channel
+        (1, vec![0u8; 20]),    // General
+        (2, vec![0u8; 24]),    // Bitmap
+        (3, vec![0u8; 84]),    // Order
+        (8, vec![0u8; 6]),     // Pointer
+        (13, vec![0u8; 88]),   // Input
+        (20, vec![0u8; 4]),    // Virtual Channel
         (0x1C, vec![0u8; 8]),  // Surface Commands
         (0x1D, vec![0u8; 69]), // Bitmap Codecs
     ];
     let demand = build_demand_active(share_id, &mut sets);
-    assert_eq!(capabilities::parse_demand_active(&demand).unwrap(), share_id);
+    assert_eq!(
+        capabilities::parse_demand_active(&demand).unwrap(),
+        share_id
+    );
 }
 
 #[test]
@@ -299,7 +304,10 @@ fn demand_active_input_flags_extracted() {
     input.extend_from_slice(&[0u8; 64]); // imeFileName
     let sets = vec![(13u16, input)]; // CAPSET_INPUT
     let demand = build_demand_active(0x0001_03EA, &sets);
-    assert_eq!(capabilities::parse_server_input_flags(&demand), Some(0x0080));
+    assert_eq!(
+        capabilities::parse_server_input_flags(&demand),
+        Some(0x0080)
+    );
 }
 
 // ---------------------------------------------------------------------------

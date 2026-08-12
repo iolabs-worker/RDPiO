@@ -10,3 +10,14 @@
 //! self-contained, cross-platform pieces.
 
 pub mod connections;
+
+// Re-exports of the in-workspace crates the `rdpio` binary (and any consumer
+// that assembles a full client from the individual crates) needs: the ASN.1
+// codec, the wire PDU codec, the sans-I/O connection state machine, and the
+// wire transport. `main.rs` imports the same crates directly; the facade makes
+// the assembled dependency set importable in one place (integration tests,
+// tooling, and the `rdpio` assembly crate).
+pub use rdp_asn1;
+pub use rdp_core;
+pub use rdp_pdu;
+pub use wire_main;

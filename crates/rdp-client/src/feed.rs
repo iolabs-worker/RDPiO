@@ -145,7 +145,9 @@ fn parse_json(json: &str) -> Result<Vec<FeedEntry>, FeedError> {
         _ => return Err(FeedError::Parse("expected array or object".into())),
     };
     for item in array {
-        let obj = item.as_object().ok_or_else(|| FeedError::Parse("expected object".into()))?;
+        let obj = item
+            .as_object()
+            .ok_or_else(|| FeedError::Parse("expected object".into()))?;
         let mut entry = FeedEntry::default();
         entry.id = string_field(obj, "id");
         entry.display_name = string_field(obj, "displayName");
@@ -153,7 +155,10 @@ fn parse_json(json: &str) -> Result<Vec<FeedEntry>, FeedError> {
         if entry.address.is_empty() {
             entry.address = string_field(obj, "hostname");
         }
-        entry.gateway = obj.get("gateway").and_then(|v| v.as_str()).map(String::from);
+        entry.gateway = obj
+            .get("gateway")
+            .and_then(|v| v.as_str())
+            .map(String::from);
         entry.load_balance_info = obj
             .get("loadBalanceInfo")
             .and_then(|v| v.as_str())
@@ -162,7 +167,10 @@ fn parse_json(json: &str) -> Result<Vec<FeedEntry>, FeedError> {
             .get("useRedirectionServer")
             .and_then(|v| v.as_bool())
             .unwrap_or(false);
-        entry.rdp_file = obj.get("rdpFile").and_then(|v| v.as_str()).map(String::from);
+        entry.rdp_file = obj
+            .get("rdpFile")
+            .and_then(|v| v.as_str())
+            .map(String::from);
 
         // W365 / AVD specific fields.
         entry.resource_id = string_field(obj, "resourceId");

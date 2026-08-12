@@ -116,7 +116,10 @@ impl Message {
     }
 
     fn get(&self, typ: u16) -> Option<&[u8]> {
-        self.attrs.iter().find(|a| a.typ == typ).map(|a| &a.value[..])
+        self.attrs
+            .iter()
+            .find(|a| a.typ == typ)
+            .map(|a| &a.value[..])
     }
 
     fn is_success(&self) -> bool {
@@ -394,7 +397,12 @@ impl TurnClient {
     /// [`Self::transact`] with a caller-chosen total deadline — used by the fast
     /// redirect probe ([`Self::resolve_backend`]), which must return well inside a
     /// live call-setup window rather than the full 5 s.
-    fn transact_within(&self, wire: &[u8], txid: &[u8; 12], total: Duration) -> io::Result<Message> {
+    fn transact_within(
+        &self,
+        wire: &[u8],
+        txid: &[u8; 12],
+        total: Duration,
+    ) -> io::Result<Message> {
         let mut rto = Duration::from_millis(500).min(total);
         let deadline = Instant::now() + total;
         let mut buf = [0u8; 2048];
@@ -415,7 +423,10 @@ impl TurnClient {
                 Err(e) => return Err(e),
             }
             if Instant::now() >= deadline {
-                return Err(io::Error::new(ErrorKind::TimedOut, "STUN transaction timed out"));
+                return Err(io::Error::new(
+                    ErrorKind::TimedOut,
+                    "STUN transaction timed out",
+                ));
             }
             rto = (rto * 2).min(Duration::from_millis(1600));
         }
@@ -429,7 +440,9 @@ impl TurnClient {
         let resp = self.transact(&wire, &txid)?;
         resp.xor_address(ATTR_XOR_MAPPED_ADDRESS)
             .or_else(|| resp.get(ATTR_MAPPED_ADDRESS).and_then(decode_plain_addr))
-            .ok_or_else(|| io::Error::new(ErrorKind::InvalidData, "Binding without a mapped address"))
+            .ok_or_else(|| {
+                io::Error::new(ErrorKind::InvalidData, "Binding without a mapped address")
+            })
     }
 
     /// TURN Allocate a UDP relay. Handles the mandatory 401 (unauthenticated
@@ -594,7 +607,10 @@ impl TurnClient {
     pub fn channel_bind(&mut self, peer: SocketAddr, channel: u16) -> io::Result<()> {
         let txid = self.txid();
         let mut req = Message::request(METHOD_CHANNEL_BIND, txid);
-        req.push(ATTR_CHANNEL_NUMBER, vec![(channel >> 8) as u8, channel as u8, 0, 0]);
+        req.push(
+            ATTR_CHANNEL_NUMBER,
+            vec![(channel >> 8) as u8, channel as u8, 0, 0],
+        );
         req.push(ATTR_XOR_PEER_ADDRESS, encode_xor_addr(peer, &txid));
         self.authenticate(&mut req);
         let resp = self.transact(&req.encode(Some(&self.key), true), &txid)?;

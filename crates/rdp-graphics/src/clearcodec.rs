@@ -522,7 +522,16 @@ fn rlex_region(
     let region = rw * rh;
     let mut idx = 0usize;
     let place = |dst: &mut [u8], idx: usize, col: [u8; 3]| {
-        put(dst, w, h, x0 + idx % rw, y0 + idx / rw, col[0], col[1], col[2]);
+        put(
+            dst,
+            w,
+            h,
+            x0 + idx % rw,
+            y0 + idx / rw,
+            col[0],
+            col[1],
+            col[2],
+        );
     };
 
     while r.remaining() >= 2 && idx < region {
@@ -722,9 +731,7 @@ fn emit_column(
 fn background_column(count: usize, r: u8, g: u8, b: u8) -> Vec<u8> {
     let mut v = vec![0u8; count * 4];
     let pixel = [r, g, b, 0xFF];
-    let pattern = u8x16::new([
-        r, g, b, 0xFF, r, g, b, 0xFF, r, g, b, 0xFF, r, g, b, 0xFF,
-    ]);
+    let pattern = u8x16::new([r, g, b, 0xFF, r, g, b, 0xFF, r, g, b, 0xFF, r, g, b, 0xFF]);
     let pattern = pattern.to_array();
     let mut chunks = v.chunks_exact_mut(16);
     for chunk in &mut chunks {
@@ -747,7 +754,7 @@ mod tests {
         let (w, h) = (4usize, 4usize);
         let mut dst = vec![0u8; w * h * 4];
         let column = vec![0xAAu8; 8 * 4]; // 8 rows offered
-        // yStart 2 in a 4-row tile → only rows 2..4 may be written.
+                                          // yStart 2 in a 4-row tile → only rows 2..4 may be written.
         emit_column(&mut dst, w, h, 1, 2, 8, &column);
         assert_eq!(&dst[(2 * w + 1) * 4..(2 * w + 1) * 4 + 4], &[0xAA; 4]);
         assert_eq!(&dst[(3 * w + 1) * 4..(3 * w + 1) * 4 + 4], &[0xAA; 4]);
@@ -772,7 +779,9 @@ mod tests {
     fn residual_solid_fill() {
         // One run of 4 red pixels (B=0,G=0,R=255, run=4) over a 2x2 tile.
         let res = [0x00, 0x00, 0xFF, 0x04];
-        let out = ClearDecoder::new().decode(&stream(&res, &[], &[]), 2, 2).unwrap();
+        let out = ClearDecoder::new()
+            .decode(&stream(&res, &[], &[]), 2, 2)
+            .unwrap();
         assert_eq!(out.len(), 16);
         for px in out.chunks_exact(4) {
             assert_eq!(px, [0xFF, 0x00, 0x00, 0xFF]); // RGBA red
@@ -783,7 +792,9 @@ mod tests {
     fn residual_run_escalation_and_partial() {
         // Blue (B=255) run of 3 then green (G=255) run of 1 over a 2x2 tile.
         let res = [0xFF, 0x00, 0x00, 0x03, 0x00, 0xFF, 0x00, 0x01];
-        let out = ClearDecoder::new().decode(&stream(&res, &[], &[]), 2, 2).unwrap();
+        let out = ClearDecoder::new()
+            .decode(&stream(&res, &[], &[]), 2, 2)
+            .unwrap();
         assert_eq!(&out[0..4], [0x00, 0x00, 0xFF, 0xFF]); // blue
         assert_eq!(&out[12..16], [0x00, 0xFF, 0x00, 0xFF]); // last pixel green
     }
@@ -799,7 +810,9 @@ mod tests {
         sub.extend_from_slice(&3u32.to_le_bytes()); // byteCount
         sub.push(SUBCODEC_RAW);
         sub.extend_from_slice(&[10, 20, 30]); // B,G,R
-        let out = ClearDecoder::new().decode(&stream(&[], &[], &sub), 1, 1).unwrap();
+        let out = ClearDecoder::new()
+            .decode(&stream(&[], &[], &sub), 1, 1)
+            .unwrap();
         assert_eq!(out, vec![30, 20, 10, 0xFF]); // RGBA
     }
 
@@ -823,7 +836,9 @@ mod tests {
         sub.extend_from_slice(&(payload.len() as u32).to_le_bytes());
         sub.push(SUBCODEC_RLEX);
         sub.extend_from_slice(&payload);
-        let out = ClearDecoder::new().decode(&stream(&[], &[], &sub), 2, 1).unwrap();
+        let out = ClearDecoder::new()
+            .decode(&stream(&[], &[], &sub), 2, 1)
+            .unwrap();
         // pixel0 = run(start=red), pixel1 = suite[1]=blue.
         assert_eq!(&out[0..4], [0xFF, 0x00, 0x00, 0xFF]); // red
         assert_eq!(&out[4..8], [0x00, 0x00, 0xFF, 0xFF]); // blue
@@ -870,7 +885,9 @@ mod tests {
         // An empty composition (no residual / bands / subcodec layers) must
         // return the seed untouched — the persistent-surface contract a partial
         // ClearCodec update relies on. Before the seed fix this came back black.
-        let seed = vec![1, 2, 3, 0xFF, 4, 5, 6, 0xFF, 7, 8, 9, 0xFF, 10, 11, 12, 0xFF];
+        let seed = vec![
+            1, 2, 3, 0xFF, 4, 5, 6, 0xFF, 7, 8, 9, 0xFF, 10, 11, 12, 0xFF,
+        ];
         let out = ClearDecoder::new()
             .decode_seeded(&stream(&[], &[], &[]), 2, 2, Some(&seed))
             .unwrap();
@@ -947,7 +964,11 @@ mod tests {
     #[test]
     fn needs_seed_residual_and_partial_region_are_true() {
         // A residual may be a partial run → seed needed.
-        assert!(needs_seed(&stream(&[0x00, 0x00, 0xFF, 0x04], &[], &[]), 2, 2));
+        assert!(needs_seed(
+            &stream(&[0x00, 0x00, 0xFF, 0x04], &[], &[]),
+            2,
+            2
+        ));
         // A RAW region not covering the whole tile → seed needed.
         let mut sub = Vec::new();
         sub.extend_from_slice(&1u16.to_le_bytes()); // x = 1 (not whole tile)
@@ -965,7 +986,15 @@ mod tests {
         let mut dec = ClearDecoder::new();
         for seed in 0u16..1500 {
             let b = seed.to_le_bytes();
-            let junk = [b[0], b[1], b[1] ^ 0x5a, b[0].wrapping_add(9), 0xFF, 0x00, b[0]];
+            let junk = [
+                b[0],
+                b[1],
+                b[1] ^ 0x5a,
+                b[0].wrapping_add(9),
+                0xFF,
+                0x00,
+                b[0],
+            ];
             let _ = dec.decode(&junk, 4, 4);
         }
     }

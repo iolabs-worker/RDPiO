@@ -3576,6 +3576,7 @@ dependencies = [
  "egui",
  "http",
  "mimalloc",
+ "rdp-asn1",
  "rdp-channels",
  "rdp-core",
  "rdp-crypto",
@@ -3598,6 +3599,7 @@ dependencies = [
  "webview2-com",
  "windows",
  "windows-core",
+ "wire-main",
 ]
 
 [[package]]
@@ -3668,6 +3670,25 @@ dependencies = [
  "tokio",
  "tracing",
  "webrtc",
+]
+
+[[package]]
+name = "rdpio"
+version = "0.0.1"
+dependencies = [
+ "rdp-asn1",
+ "rdp-channels",
+ "rdp-client",
+ "rdp-core",
+ "rdp-crypto",
+ "rdp-gpu",
+ "rdp-graphics",
+ "rdp-nla",
+ "rdp-pdu",
+ "rdp-webrtc",
+ "thiserror 1.0.69",
+ "tracing",
+ "wire-main",
 ]
 
 [[package]]

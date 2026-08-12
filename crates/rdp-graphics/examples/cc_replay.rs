@@ -40,7 +40,13 @@ fn parse(data: &[u8]) -> Vec<Rec<'_>> {
         if p + len > data.len() {
             break;
         }
-        out.push(Rec { x, y, w, h, stream: &data[p..p + len] });
+        out.push(Rec {
+            x,
+            y,
+            w,
+            h,
+            stream: &data[p..p + len],
+        });
         p += len;
     }
     out
@@ -92,7 +98,15 @@ fn main() {
     }
     let dw = recs.iter().map(|r| r.x + r.w as usize).max().unwrap_or(0);
     let dh = recs.iter().map(|r| r.y + r.h as usize).max().unwrap_or(0);
-    println!("replaying {} tiles onto {dw}x{dh} (fps={fps})", recs.len(), fps = if fps == 0 { "max".to_string() } else { fps.to_string() });
+    println!(
+        "replaying {} tiles onto {dw}x{dh} (fps={fps})",
+        recs.len(),
+        fps = if fps == 0 {
+            "max".to_string()
+        } else {
+            fps.to_string()
+        }
+    );
 
     let mut fb = vec![0u8; dw * dh * 4];
     let mut dec = ClearDecoder::new();

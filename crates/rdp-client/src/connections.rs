@@ -203,12 +203,8 @@ impl ConnectionStore {
 
     /// All saved profiles, sorted by name.
     pub fn saved_connections(&self) -> Vec<ConnectionProfile> {
-        let mut saved: Vec<ConnectionProfile> = self
-            .profiles
-            .iter()
-            .filter(|p| p.saved)
-            .cloned()
-            .collect();
+        let mut saved: Vec<ConnectionProfile> =
+            self.profiles.iter().filter(|p| p.saved).cloned().collect();
         saved.sort_by(|a, b| a.name.cmp(&b.name));
         saved
     }
@@ -335,7 +331,11 @@ mod tests {
         let again = profile("Work (renamed)", "10.0.0.5", "alice");
         store.record_connection(again);
 
-        assert_eq!(store.profiles.len(), 1, "deduplicated by host:port:username");
+        assert_eq!(
+            store.profiles.len(),
+            1,
+            "deduplicated by host:port:username"
+        );
         let p = &store.profiles[0];
         assert!(p.saved, "saved flag is preserved across record_connection");
         assert_eq!(p.name, "work", "existing entry keeps its identity");
@@ -435,8 +435,9 @@ mod tests {
     #[test]
     fn from_cli_requires_host() {
         assert!(ConnectionProfile::from_cli(None, None, None, false).is_none());
-        assert!(ConnectionProfile::from_cli(None, Some("u".into()), Some("p".into()), true)
-            .is_none());
+        assert!(
+            ConnectionProfile::from_cli(None, Some("u".into()), Some("p".into()), true).is_none()
+        );
     }
 
     #[test]

@@ -12,11 +12,11 @@
 //! hosts so the sans-I/O crates stay testable everywhere.
 
 #[cfg(windows)]
+mod backend;
+#[cfg(windows)]
 mod d3d11;
 #[cfg(windows)]
 mod d3d12;
-#[cfg(windows)]
-mod backend;
 #[cfg(windows)]
 pub use backend::{Backend, Renderer};
 

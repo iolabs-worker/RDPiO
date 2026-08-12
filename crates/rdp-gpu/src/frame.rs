@@ -201,13 +201,7 @@ impl FrameReceiver {
 pub fn frame_channel(capacity: usize) -> (FrameSender, FrameReceiver) {
     let capacity = capacity.max(1);
     let (tx, rx) = mpsc::sync_channel(capacity);
-    (
-        FrameSender {
-            tx,
-            capacity,
-        },
-        FrameReceiver { rx },
-    )
+    (FrameSender { tx, capacity }, FrameReceiver { rx })
 }
 
 #[cfg(test)]
@@ -244,8 +238,7 @@ mod tests {
     fn channel_handoff_preserves_order_and_unit_tags() {
         let (tx, rx) = frame_channel(8);
         for i in 0..5i64 {
-            let frame =
-                DecodedFrame::from_nv12(vec![i as u8; 64 * 48 * 3 / 2], 64, 48, i).unwrap();
+            let frame = DecodedFrame::from_nv12(vec![i as u8; 64 * 48 * 3 / 2], 64, 48, i).unwrap();
             assert!(tx.send(frame), "queue has room for all five frames");
         }
         for i in 0..5i64 {
@@ -285,7 +278,11 @@ mod tests {
                 height,
             } => {
                 assert_eq!((width, height), (32, 32));
-                assert_eq!(data, &nv12[..], "present op borrows the frame's NV12, no copy");
+                assert_eq!(
+                    data,
+                    &nv12[..],
+                    "present op borrows the frame's NV12, no copy"
+                );
             }
             other => panic!("CPU frame must convert to the Nv12 present op, got {other:?}"),
         }

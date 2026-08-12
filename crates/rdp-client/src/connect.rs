@@ -129,18 +129,20 @@ pub(crate) fn run_headless(config: &ClientConfig) -> Result<(), transport::Negot
     // Enhanced RDP Security (SSL) and NLA (HYBRID) both run inside a TLS tunnel;
     // Standard RDP Security runs directly over the socket.
     if protocol.contains(SecurityProtocol::SSL) || protocol.contains(SecurityProtocol::HYBRID) {
-        let mut tls =
-            match tls::TlsStream::connect(stream, &config.hostname, config.allow_invalid_certificate)
-            {
-                Ok(tls) => {
-                    tracing::info!("TLS established (rustls)");
-                    tls
-                }
-                Err(err) => {
-                    tracing::warn!(error = %err, "TLS handshake failed");
-                    return Ok(());
-                }
-            };
+        let mut tls = match tls::TlsStream::connect(
+            stream,
+            &config.hostname,
+            config.allow_invalid_certificate,
+        ) {
+            Ok(tls) => {
+                tracing::info!("TLS established (rustls)");
+                tls
+            }
+            Err(err) => {
+                tracing::warn!(error = %err, "TLS handshake failed");
+                return Ok(());
+            }
+        };
 
         if protocol.contains(SecurityProtocol::HYBRID) {
             // NLA/CredSSP (MS-CSSP) authenticates over the TLS channel — binding to

@@ -368,10 +368,7 @@ fn try_establish_reverse_connect(
 
 /// Apply a server redirection descriptor to `config` so the next connection
 /// attempt targets the assigned session host and replays the broker token.
-fn apply_redirection(
-    config: &mut ClientConfig,
-    redir: &rdp_pdu::redirection::ServerRedirection,
-) {
+fn apply_redirection(config: &mut ClientConfig, redir: &rdp_pdu::redirection::ServerRedirection) {
     if let Some(addr) = redir
         .target_net_address
         .as_ref()
@@ -413,7 +410,10 @@ mod tests {
         apply_redirection(&mut config, &redir);
         assert_eq!(config.hostname, "192.0.2.42");
         assert_eq!(config.port, 3390);
-        assert_eq!(config.load_balance_info, Some(b"Cookie: msts=token".to_vec()));
+        assert_eq!(
+            config.load_balance_info,
+            Some(b"Cookie: msts=token".to_vec())
+        );
         assert_eq!(config.redirected_session_id, Some(0x1234_5678));
     }
 

@@ -117,8 +117,7 @@ fn parse_xml(xml: &str) -> Result<Vec<FeedEntry>, FeedError> {
             tenant_id: text_of(&resource, "TenantId").unwrap_or_default(),
             session_id: text_of(&resource, "SessionId").unwrap_or_default(),
             gateway_fqdn: text_of(&resource, "GatewayFqdn").unwrap_or_default(),
-            use_reverse_connect: text_of(&resource, "UseReverseConnect").as_deref()
-                == Some("true"),
+            use_reverse_connect: text_of(&resource, "UseReverseConnect").as_deref() == Some("true"),
             ..FeedEntry::default()
         };
 

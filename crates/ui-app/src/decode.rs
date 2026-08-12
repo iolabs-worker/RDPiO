@@ -99,9 +99,11 @@ pub fn split_access_units(nals: &[NalUnit]) -> Vec<AccessUnit> {
         let is_vcl = nal.nal_type >= 1 && nal.nal_type <= 5;
         let boundary = if current.is_empty() {
             false
-        } else if nal.nal_type == NAL_TYPE_IDR {
-            true
         } else {
+            // A VCL NAL starts a new access unit once the current unit already
+            // holds a VCL NAL (an IDR or another slice). Parameter sets and SEI
+            // that precede the first VCL of an access unit belong to that unit,
+            // so an SPS/PPS directly before an IDR stays with it.
             is_vcl && has_vcl
         };
         if boundary {
@@ -375,19 +377,27 @@ mod tests {
     /// Build an SPS NAL for a baseline-profile stream with the given
     /// macroblock dimensions and no cropping.
     fn build_sps(width_mbs: u32, height_mbs: u32, frame_mbs_only: u32) -> Vec<u8> {
-        // bit writer: msb-first
-        struct W(Vec<u8>, u32);
+        // bit writer: msb-first, buffering whole bytes
+        struct W {
+            bytes: Vec<u8>,
+            acc: u32,
+            nbits: u32,
+        }
         impl W {
+            fn new() -> Self {
+                Self {
+                    bytes: Vec::new(),
+                    acc: 0,
+                    nbits: 0,
+                }
+            }
             fn bit(&mut self, b: u32) {
-                self.1 = (self.1 << 1) | b;
-                self.0.push(0);
-                let n = self.0.len() - 1;
-                if (self.1 & 0x80) != 0 {
-                    self.0[n] = self.1 as u8;
-                    self.1 = 0;
-                } else {
-                    self.0[n] = (self.1 << (8 - (self.1.leading_zeros() as u32))) as u8;
-                    self.0[n] = 0;
+                self.acc = (self.acc << 1) | (b & 1);
+                self.nbits += 1;
+                if self.nbits == 8 {
+                    self.bytes.push(self.acc as u8);
+                    self.acc = 0;
+                    self.nbits = 0;
                 }
             }
             fn bits(&mut self, v: u32, n: u32) {
@@ -403,13 +413,16 @@ mod tests {
                 }
                 self.bits(code_num, len);
             }
-            fn flush(&mut self) {
-                while self.1 != 0 {
+            /// Pad with the RBSP stop bit and zero bits to the byte boundary.
+            fn finish(mut self) -> Vec<u8> {
+                self.bit(1);
+                while self.nbits != 0 {
                     self.bit(0);
                 }
+                self.bytes
             }
         }
-        let mut w = W(Vec::new(), 0);
+        let mut w = W::new();
         w.bits(66, 8); // profile_idc = baseline
         w.bits(0, 8); // constraint flags
         w.bits(30, 8); // level_idc = 3.0
@@ -422,16 +435,14 @@ mod tests {
         w.ue(width_mbs - 1);
         w.ue(height_mbs - 1);
         w.bit(frame_mbs_only);
+        if frame_mbs_only == 0 {
+            w.bit(0); // mb_adaptive_frame_field_flag
+        }
         w.bit(1); // direct_8x8_inference
         w.bit(0); // frame_cropping
-        w.flush();
-        // rbsp trailing bits
-        w.bit(1);
-        while w.1 != 0 {
-            w.bit(0);
-        }
+        let rbsp = w.finish();
         let mut nal = vec![0x67]; // NAL header: forbidden=0, nri=3, type=7
-        nal.extend_from_slice(&w.0);
+        nal.extend_from_slice(&rbsp);
         nal
     }
 

@@ -840,7 +840,6 @@ fn parse_ice_servers(config: &Value) -> Vec<RTCIceServer> {
                 .and_then(|v| v.as_str())
                 .unwrap_or("")
                 .to_string(),
-            ..Default::default()
         })
         .collect()
 }

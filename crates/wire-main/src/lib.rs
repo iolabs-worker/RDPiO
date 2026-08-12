@@ -19,11 +19,13 @@ pub mod transport;
 
 pub use error::{WireError, WireResult};
 pub use session::{
-    ChannelPurpose, ConnectOptions, Monitor, ServerPdu, SessionSettings, StaticChannel,
-    WireSession,
+    ChannelPurpose, ConnectOptions, Monitor, ServerPdu, SessionSettings, StaticChannel, WireSession,
 };
-pub use transport::{TransportOptions, UdpSideband, WireTransport};
+pub use transport::{
+    TransportOptions, UdpDelivery, UdpFrame, UdpRecv, UdpSequencer, UdpSideband, UdpStats,
+    WireTransport,
+};
 
 /// Re-export the input event types so UI code can build input PDUs without
 /// importing the codec module directly.
-pub use pdu::{InputEvent, kbd, ptr};
+pub use pdu::{kbd, ptr, InputEvent};

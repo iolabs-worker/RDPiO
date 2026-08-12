@@ -75,10 +75,7 @@ pub fn run(transport: &mut WireTransport, opts: &ConnectOptions) -> WireResult<H
         share_id,
         "connection sequence complete"
     );
-    Ok(Handshake {
-        settings,
-        security,
-    })
+    Ok(Handshake { settings, security })
 }
 
 // --- Step 1: X.224 ---------------------------------------------------------
@@ -106,7 +103,10 @@ fn negotiate(transport: &mut WireTransport, opts: &ConnectOptions) -> WireResult
 
 // --- Step 2: MCS Connect ---------------------------------------------------
 
-fn mcs_connect(transport: &mut WireTransport, opts: &ConnectOptions) -> WireResult<gcc::ServerDataBlocks> {
+fn mcs_connect(
+    transport: &mut WireTransport,
+    opts: &ConnectOptions,
+) -> WireResult<gcc::ServerDataBlocks> {
     let core = gcc::ClientCoreData {
         desktop_width: opts.width,
         desktop_height: opts.height,
@@ -235,7 +235,10 @@ fn join_channels(
 
     let mut static_channels = Vec::with_capacity(names.len());
     for (i, name) in names.into_iter().enumerate() {
-        let id = assigned.get(i + 1).copied().unwrap_or(mcs::MCS_FIRST_STATIC_CHANNEL + i as u16);
+        let id = assigned
+            .get(i + 1)
+            .copied()
+            .unwrap_or(mcs::MCS_FIRST_STATIC_CHANNEL + i as u16);
         join_one(transport, user_id, id)?;
         static_channels.push(crate::session::StaticChannel { name, id });
     }
@@ -480,8 +483,10 @@ fn fill_random(buf: &mut [u8]) {
         .duration_since(UNIX_EPOCH)
         .map(|d| d.as_nanos() as u64)
         .unwrap_or(0x9e37_79b9_7f4a_7c15);
-    let mut state =
-        nanos ^ COUNTER.fetch_add(1, Ordering::Relaxed).wrapping_add(0x9e37_79b9_7f4a_7c15);
+    let mut state = nanos
+        ^ COUNTER
+            .fetch_add(1, Ordering::Relaxed)
+            .wrapping_add(0x9e37_79b9_7f4a_7c15);
     for chunk in buf.chunks_mut(8) {
         state ^= state >> 12;
         state ^= state << 25;

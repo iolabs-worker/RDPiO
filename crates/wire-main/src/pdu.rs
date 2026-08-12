@@ -225,10 +225,7 @@ pub mod x224 {
     #[derive(Debug, Clone, PartialEq, Eq)]
     pub enum ConnectionConfirm {
         /// Negotiation accepted; `selected_protocol` is the server's choice.
-        Response {
-            flags: u8,
-            selected_protocol: u32,
-        },
+        Response { flags: u8, selected_protocol: u32 },
         /// The server rejected the negotiation with a failure code.
         Failure { code: u32 },
         /// Legacy confirm without an RDP negotiation structure.
@@ -378,7 +375,9 @@ pub mod mcs {
     /// Parse an MCS Connect-Response from a TPKT body (DT-framed or bare).
     pub fn parse_connect_response(pdu: &[u8]) -> WireResult<ConnectResponse> {
         let mut body = x224::strip_data_header(pdu);
-        if body.len() < 2 || body[0] != CONNECT_RESPONSE_TAG[0] || body[1] != CONNECT_RESPONSE_TAG[1]
+        if body.len() < 2
+            || body[0] != CONNECT_RESPONSE_TAG[0]
+            || body[1] != CONNECT_RESPONSE_TAG[1]
         {
             return Err(protocol_err!(
                 "expected MCS Connect-Response tag, got {:02x?}",
@@ -395,10 +394,7 @@ pub mod mcs {
         let _called_connect_id = ber::expect(&mut body, ber::TAG_INTEGER)?;
         let _domain_parameters = ber::expect(&mut body, ber::TAG_SEQUENCE)?;
         let user_data = ber::expect(&mut body, ber::TAG_OCTET_STRING)?;
-        Ok(ConnectResponse {
-            result,
-            user_data,
-        })
+        Ok(ConnectResponse { result, user_data })
     }
 
     /// MCS Erect Domain Request (subHeight = subInterval = 0).
@@ -424,7 +420,10 @@ pub mod mcs {
             return Err(protocol_err!("bad Attach User Confirm choice"));
         }
         if mcs[1] != 0 {
-            return Err(protocol_err!("Attach User Confirm failed (result {})", mcs[1]));
+            return Err(protocol_err!(
+                "Attach User Confirm failed (result {})",
+                mcs[1]
+            ));
         }
         Ok(AttachUserConfirm {
             user_id: u16::from_be_bytes([mcs[2], mcs[3]]),
@@ -433,9 +432,7 @@ pub mod mcs {
 
     /// MCS Channel Join Request for `channel_id` from `user_id`.
     pub fn channel_join_request(user_id: u16, channel_id: u16) -> Vec<u8> {
-        let mut out = vec![(CHOICE_CHANNEL_JOIN_CONFIRM << 2) | 0x00];
-        // Channel Join Request choice is 14; encode directly.
-        out[0] = 0x38;
+        let mut out = vec![0x38]; // Channel Join Request choice is 14
         out.extend_from_slice(&user_id.to_be_bytes());
         out.extend_from_slice(&channel_id.to_be_bytes());
         out
@@ -1240,7 +1237,12 @@ pub mod caps {
     }
 
     /// Write a 6-byte Share Control Header.
-    pub fn write_share_control_header(pdu_type: u16, pdu_source: u16, payload_len: usize, out: &mut Vec<u8>) {
+    pub fn write_share_control_header(
+        pdu_type: u16,
+        pdu_source: u16,
+        payload_len: usize,
+        out: &mut Vec<u8>,
+    ) {
         put_u16((6 + payload_len) as u16, out);
         put_u16(PROTOCOL_VERSION | pdu_type, out);
         put_u16(pdu_source, out);
@@ -1248,7 +1250,12 @@ pub mod caps {
 
     /// Write a 12-byte Share Data Header. `payload_len` is the length of
     /// everything that follows this header.
-    pub fn write_share_data_header(share_id: u32, pdu_type2: u8, payload_len: usize, out: &mut Vec<u8>) {
+    pub fn write_share_data_header(
+        share_id: u32,
+        pdu_type2: u8,
+        payload_len: usize,
+        out: &mut Vec<u8>,
+    ) {
         put_u32(share_id, out);
         out.push(0); // pad1
         out.push(0); // streamId
@@ -1323,7 +1330,11 @@ pub mod caps {
             rest = &rest[len..];
         }
         let caps_len = cur.len() - 8 - rest.len();
-        let _session_id = if rest.len() >= 4 { &rest[rest.len() - 4..] } else { &[][..] };
+        let _session_id = if rest.len() >= 4 {
+            &rest[rest.len() - 4..]
+        } else {
+            &[][..]
+        };
         Ok(DemandActive {
             share_id,
             caps: cur[8..8 + caps_len].to_vec(),
@@ -1402,9 +1413,8 @@ pub mod info {
             flags |= INFO_AUTOLOGON;
         }
 
-        let utf16 = |s: &str| -> Vec<u8> {
-            s.encode_utf16().flat_map(|u| u.to_le_bytes()).collect()
-        };
+        let utf16 =
+            |s: &str| -> Vec<u8> { s.encode_utf16().flat_map(|u| u.to_le_bytes()).collect() };
         let domain = utf16(&info.domain);
         let user = utf16(&info.username);
         let password = utf16(&info.password);
@@ -1447,31 +1457,15 @@ pub mod ptr {
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum InputEvent {
     /// Scancode keyboard event.
-    Keyboard {
-        flags: u16,
-        key_code: u16,
-    },
+    Keyboard { flags: u16, key_code: u16 },
     /// Unicode keyboard event.
-    UnicodeKeyboard {
-        flags: u16,
-        unicode: u16,
-    },
+    UnicodeKeyboard { flags: u16, unicode: u16 },
     /// Standard mouse event (2-byte coordinates).
-    Mouse {
-        flags: u16,
-        x: u16,
-        y: u16,
-    },
+    Mouse { flags: u16, x: u16, y: u16 },
     /// Extended mouse event (wheel / 16-bit coordinates).
-    ExtendedMouse {
-        flags: u16,
-        x: u16,
-        y: u16,
-    },
+    ExtendedMouse { flags: u16, x: u16, y: u16 },
     /// Synchronize event (caps lock / num lock state).
-    Sync {
-        number_of_keys: u16,
-    },
+    Sync { number_of_keys: u16 },
 }
 
 const INPUT_EVENT_MOUSE: u16 = 0x0001;
@@ -1670,7 +1664,8 @@ mod tests {
 
     #[test]
     fn license_error_pdu_parses() {
-        let pdu = license::license_error_pdu(license::STATUS_VALID_CLIENT, license::ST_NO_TRANSITION);
+        let pdu =
+            license::license_error_pdu(license::STATUS_VALID_CLIENT, license::ST_NO_TRANSITION);
         let preamble = license::parse_preamble(&pdu).unwrap();
         assert_eq!(preamble.msg_type, license::ERROR_ALERT);
         let err = license::parse_license_error(&pdu[4..]).unwrap();
@@ -1718,7 +1713,12 @@ mod tests {
         put_u32(0, &mut body); // sessionId
 
         let mut pdu = Vec::new();
-        caps::write_share_control_header(caps::PDUTYPE_DEMAND_ACTIVE, 1002, 12 + body.len(), &mut pdu);
+        caps::write_share_control_header(
+            caps::PDUTYPE_DEMAND_ACTIVE,
+            1002,
+            12 + body.len(),
+            &mut pdu,
+        );
         caps::write_share_data_header(0x0003_0000, 0x11, body.len(), &mut pdu);
         pdu.extend_from_slice(&body);
 

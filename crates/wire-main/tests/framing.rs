@@ -5,7 +5,7 @@ use std::net::{TcpListener, UdpSocket};
 use std::thread;
 
 use wire_main::pdu::{mcs, x224};
-use wire_main::transport::{TPKT_VERSION, TransportOptions, UdpSideband, WireTransport};
+use wire_main::transport::{TransportOptions, UdpFrame, UdpSideband, WireTransport, TPKT_VERSION};
 
 fn pair() -> (WireTransport, WireTransport) {
     let listener = TcpListener::bind("127.0.0.1:0").unwrap();
@@ -57,7 +57,10 @@ fn transport_recv_frame_includes_header() {
     client.send(b"abcd").unwrap();
     let frame = server.recv_frame().unwrap();
     assert_eq!(frame[0], TPKT_VERSION);
-    assert_eq!(u16::from_be_bytes([frame[2], frame[3]]) as usize, frame.len());
+    assert_eq!(
+        u16::from_be_bytes([frame[2], frame[3]]) as usize,
+        frame.len()
+    );
     assert_eq!(&frame[4..], b"abcd");
 }
 
@@ -91,11 +94,106 @@ fn transport_mcs_data_roundtrip_framing() {
 fn transport_udp_sideband_sends_datagrams() {
     let sink = UdpSocket::bind("127.0.0.1:0").unwrap();
     let addr = sink.local_addr().unwrap();
-    let sideband = UdpSideband::connect("127.0.0.1", addr.port(), std::time::Duration::from_secs(2))
-        .unwrap();
+    let sideband =
+        UdpSideband::connect("127.0.0.1", addr.port(), std::time::Duration::from_secs(2)).unwrap();
     sideband.send(b"ping").unwrap();
 
     let mut buf = [0u8; 64];
     let (n, _from) = sink.recv_from(&mut buf).unwrap();
     assert_eq!(&buf[..n], b"ping");
+}
+
+#[test]
+fn transport_udp_sideband_sequence_framing() {
+    let sink = UdpSocket::bind("127.0.0.1:0").unwrap();
+    let addr = sink.local_addr().unwrap();
+    let mut sideband =
+        UdpSideband::connect("127.0.0.1", addr.port(), std::time::Duration::from_secs(2)).unwrap();
+
+    let seq = sideband.send_data(b"frame-0").unwrap();
+    assert_eq!(seq, 0);
+    let seq = sideband.send_data(b"frame-1").unwrap();
+    assert_eq!(seq, 1);
+
+    // The wire carries a 10-byte framed header, not the raw payload.
+    let mut buf = [0u8; 128];
+    let (n, _from) = sink.recv_from(&mut buf).unwrap();
+    let frame = UdpFrame::parse(&buf[..n]).unwrap();
+    assert_eq!(frame.seq, 0);
+    assert_eq!(frame.payload, b"frame-0");
+    let (n, _from) = sink.recv_from(&mut buf).unwrap();
+    let frame = UdpFrame::parse(&buf[..n]).unwrap();
+    assert_eq!(frame.seq, 1);
+    assert_eq!(frame.payload, b"frame-1");
+}
+
+#[test]
+fn transport_udp_sideband_ack_roundtrip() {
+    let sink = UdpSocket::bind("127.0.0.1:0").unwrap();
+    let addr = sink.local_addr().unwrap();
+    let sideband =
+        UdpSideband::connect("127.0.0.1", addr.port(), std::time::Duration::from_secs(2)).unwrap();
+    sideband.send_ack(9).unwrap();
+
+    let mut buf = [0u8; 64];
+    let (n, _from) = sink.recv_from(&mut buf).unwrap();
+    let frame = UdpFrame::parse(&buf[..n]).unwrap();
+    assert!(frame.is_ack());
+    assert_eq!(frame.seq, 9);
+    assert!(frame.payload.is_empty());
+}
+
+/// An out-of-order datagram is held and only delivered once the gap fills;
+/// the receiver's reassembler hands the batch back in sequence order.
+#[test]
+fn transport_udp_sideband_reassembles_out_of_order() {
+    let sink = UdpSocket::bind("127.0.0.1:0").unwrap();
+    let addr = sink.local_addr().unwrap();
+    let mut sideband =
+        UdpSideband::connect("127.0.0.1", addr.port(), std::time::Duration::from_secs(2)).unwrap();
+    let client_addr = sideband.local_addr().unwrap();
+
+    // The peer sends seq 1 before seq 0 (encoded by hand).
+    let late = UdpFrame::data(1, b"b".to_vec()).encode();
+    let early = UdpFrame::data(0, b"a".to_vec()).encode();
+    sink.send_to(&late, client_addr).unwrap();
+    sink.send_to(&early, client_addr).unwrap();
+
+    assert_eq!(
+        sideband.recv_frame().unwrap(),
+        wire_main::UdpRecv::Held { seq: 1, missing: 1 }
+    );
+    assert_eq!(
+        sideband.recv_frame().unwrap(),
+        wire_main::UdpRecv::Payloads(vec![b"a".to_vec(), b"b".to_vec()])
+    );
+    let stats = sideband.stats();
+    assert_eq!(stats.delivered, 2);
+    assert_eq!(stats.lost, 1);
+    assert_eq!(stats.held, 0);
+}
+
+#[test]
+fn transport_udp_sideband_drops_duplicates() {
+    let sink = UdpSocket::bind("127.0.0.1:0").unwrap();
+    let addr = sink.local_addr().unwrap();
+    let mut sideband =
+        UdpSideband::connect("127.0.0.1", addr.port(), std::time::Duration::from_secs(2)).unwrap();
+    let client_addr = sideband.local_addr().unwrap();
+
+    let datagram = UdpFrame::data(0, b"a".to_vec()).encode();
+    sink.send_to(&datagram, client_addr).unwrap();
+    sink.send_to(&datagram, client_addr).unwrap();
+
+    assert_eq!(
+        sideband.recv_frame().unwrap(),
+        wire_main::UdpRecv::Payloads(vec![b"a".to_vec()])
+    );
+    assert_eq!(
+        sideband.recv_frame().unwrap(),
+        wire_main::UdpRecv::Duplicate(0)
+    );
+    let stats = sideband.stats();
+    assert_eq!(stats.duplicates, 1);
+    assert_eq!(stats.delivered, 1);
 }

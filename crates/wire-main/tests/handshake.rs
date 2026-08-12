@@ -241,8 +241,8 @@ fn fake_server(listener: TcpListener, expected_channels: usize) {
     content.push(0x01);
     content.push(0x00); // calledConnectId = 0
     content.extend_from_slice(&[0x30, 0x00]); // empty domain params
-    // GCC Conference Create Response: [APPLICATION 17] wrapping nodeID, tag,
-    // and the userData (the server data blocks).
+                                              // GCC Conference Create Response: [APPLICATION 17] wrapping nodeID, tag,
+                                              // and the userData (the server data blocks).
     let mut ccr_inner = Vec::new();
     ccr_inner.extend(ber_element(0x04, &[0x01])); // nodeID
     ccr_inner.extend(ber_element(0x04, &[])); // tag
@@ -450,10 +450,7 @@ fn handshake_scripted_against_fake_server() {
             y: 20,
         }])
         .unwrap();
-    assert!(matches!(
-        session.recv().unwrap(),
-        ServerPdu::Update(_)
-    ));
+    assert!(matches!(session.recv().unwrap(), ServerPdu::Update(_)));
 
     server.join().unwrap();
 }

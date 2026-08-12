@@ -67,14 +67,14 @@ fn region(fb: &[u8], dw: usize, dh: usize, x: usize, y: usize, w: usize, h: usiz
     out
 }
 
-fn put(fb: &mut [u8], dw: usize, dh: usize, x: usize, y: usize, w: usize, h: usize, rgba: &[u8]) {
+fn put(fb: &mut [u8], size: (usize, usize), x: usize, y: usize, w: usize, h: usize, rgba: &[u8]) {
     for row in 0..h {
         let dy = y + row;
-        if dy >= dh || x >= dw {
+        if dy >= size.1 || x >= size.0 {
             continue;
         }
-        let cols = (dw - x).min(w);
-        let d = (dy * dw + x) * 4;
+        let cols = (size.0 - x).min(w);
+        let d = (dy * size.0 + x) * 4;
         let s = row * w * 4;
         fb[d..d + cols * 4].copy_from_slice(&rgba[s..s + cols * 4]);
     }
@@ -134,7 +134,7 @@ fn main() {
         };
         if let Some(rgba) = dec.decode_seeded(r.stream, r.w, r.h, seed.as_deref()) {
             if rgba.len() == w * h * 4 {
-                put(&mut fb, dw, dh, r.x, r.y, w, h, &rgba);
+                put(&mut fb, (dw, dh), r.x, r.y, w, h, &rgba);
             }
         }
         if i % every_n == every_n - 1 || i + 1 == recs.len() {

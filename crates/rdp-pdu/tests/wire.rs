@@ -273,7 +273,7 @@ fn demand_active_with_rfx_caps_parses_share_id() {
     let share_id = 0x0003_0000;
     // 8 capability sets (the RemoteFX-enabled client advertises
     // Surface Commands + Bitmap Codecs on top of the 6 base sets).
-    let mut sets: Vec<(u16, Vec<u8>)> = vec![
+    let sets: Vec<(u16, Vec<u8>)> = vec![
         (1, vec![0u8; 20]),    // General
         (2, vec![0u8; 24]),    // Bitmap
         (3, vec![0u8; 84]),    // Order
@@ -283,7 +283,7 @@ fn demand_active_with_rfx_caps_parses_share_id() {
         (0x1C, vec![0u8; 8]),  // Surface Commands
         (0x1D, vec![0u8; 69]), // Bitmap Codecs
     ];
-    let demand = build_demand_active(share_id, &mut sets);
+    let demand = build_demand_active(share_id, &sets);
     assert_eq!(
         capabilities::parse_demand_active(&demand).unwrap(),
         share_id

@@ -1603,8 +1603,8 @@ impl ProgressiveDecoder {
             } => {
                 let entry = self.tiles.entry((*x_idx, *y_idx)).or_default();
                 let mut state = std::mem::take(entry);
-                for ci in 0..3 {
-                    state.comps[ci].bit_pos = bitpos[ci];
+                for (comp, &bp) in state.comps.iter_mut().zip(bitpos.iter()) {
+                    comp.bit_pos = bp;
                 }
                 Ok(Slot {
                     parsed,
@@ -1634,8 +1634,8 @@ impl ProgressiveDecoder {
                     entry.comps[2].bit_pos.sub(&new_bitpos[2]).ok_or(nb)?,
                 ];
                 let mut state = std::mem::take(entry);
-                for ci in 0..3 {
-                    state.comps[ci].bit_pos = new_bitpos[ci];
+                for (comp, &bp) in state.comps.iter_mut().zip(new_bitpos.iter()) {
+                    comp.bit_pos = bp;
                 }
                 Ok(Slot {
                     parsed,

@@ -217,7 +217,7 @@ impl ConnectionStore {
             .iter()
             .filter_map(|p| p.last_connected_at.map(|ts| (ts, p.clone())))
             .collect();
-        recent.sort_by(|a, b| b.0.cmp(&a.0));
+        recent.sort_by_key(|b| std::cmp::Reverse(b.0));
         recent.into_iter().take(limit).map(|(_, p)| p).collect()
     }
 }

@@ -6,6 +6,7 @@
 //!   1. **residual** — a whole-tile RLE of solid colour runs (the background);
 //!   2. **bands** — vertical columns ("vBars") with a two-level vBar cache;
 //!   3. **subcodecs** — rectangular regions coded RAW, NSCodec, or RLEX (palette).
+//!
 //! A small-tile **glyph cache** (4000 entries) lets the server replay repeated
 //! tiles by index. This module is the pure decoder; it outputs RGBA8 and holds
 //! the glyph/vBar caches across calls (one channel-global [`ClearDecoder`],
@@ -156,9 +157,9 @@ pub fn needs_seed(data: &[u8], width: u16, height: u16) -> bool {
 }
 
 #[inline]
-fn put(dst: &mut [u8], w: usize, h: usize, x: usize, y: usize, r: u8, g: u8, b: u8) {
-    if x < w && y < h {
-        let o = (y * w + x) * 4;
+fn put(dst: &mut [u8], size: (usize, usize), x: usize, y: usize, r: u8, g: u8, b: u8) {
+    if x < size.0 && y < size.1 {
+        let o = (y * size.0 + x) * 4;
         dst[o] = r;
         dst[o + 1] = g;
         dst[o + 2] = b;
@@ -449,15 +450,48 @@ fn subcodecs(data: &[u8], w: usize, h: usize, dst: &mut [u8]) -> [usize; 3] {
         };
         match subcodec_id {
             SUBCODEC_RAW => {
-                raw_region(sub, x_start, y_start, rw, rh, w, h, dst);
+                raw_region(
+                    sub,
+                    Region {
+                        x0: x_start,
+                        y0: y_start,
+                        rw,
+                        rh,
+                        w,
+                        h,
+                    },
+                    dst,
+                );
                 counts[0] += 1;
             }
             SUBCODEC_NSCODEC => {
-                let _ = nscodec_region(sub, x_start, y_start, rw, rh, w, h, dst);
+                let _ = nscodec_region(
+                    sub,
+                    Region {
+                        x0: x_start,
+                        y0: y_start,
+                        rw,
+                        rh,
+                        w,
+                        h,
+                    },
+                    dst,
+                );
                 counts[1] += 1;
             }
             SUBCODEC_RLEX => {
-                let _ = rlex_region(sub, x_start, y_start, rw, rh, w, h, dst);
+                let _ = rlex_region(
+                    sub,
+                    Region {
+                        x0: x_start,
+                        y0: y_start,
+                        rw,
+                        rh,
+                        w,
+                        h,
+                    },
+                    dst,
+                );
                 counts[2] += 1;
             }
             _ => {}
@@ -466,39 +500,49 @@ fn subcodecs(data: &[u8], w: usize, h: usize, dst: &mut [u8]) -> [usize; 3] {
     counts
 }
 
-/// RAW subcodec: `rw*rh` B,G,R triples, row-major, into the region.
-fn raw_region(
-    data: &[u8],
+/// A destination region within a `w`x`h` frame: pixels `x0..x0+rw`,
+/// `y0..y0+rh`.
+#[derive(Clone, Copy)]
+struct Region {
     x0: usize,
     y0: usize,
     rw: usize,
     rh: usize,
     w: usize,
     h: usize,
-    dst: &mut [u8],
-) {
+}
+
+/// RAW subcodec: `rw*rh` B,G,R triples, row-major, into the region.
+fn raw_region(data: &[u8], reg: Region, dst: &mut [u8]) {
+    let Region {
+        x0,
+        y0,
+        rw,
+        rh,
+        w,
+        h,
+    } = reg;
     let mut r = Reader::new(data);
     for y in 0..rh {
         for x in 0..rw {
             let (Some(b), Some(g), Some(rr)) = (r.u8(), r.u8(), r.u8()) else {
                 return;
             };
-            put(dst, w, h, x0 + x, y0 + y, rr, g, b);
+            put(dst, (w, h), x0 + x, y0 + y, rr, g, b);
         }
     }
 }
 
 /// RLEX subcodec: a small palette plus index runs with a trailing "suite".
-fn rlex_region(
-    data: &[u8],
-    x0: usize,
-    y0: usize,
-    rw: usize,
-    rh: usize,
-    w: usize,
-    h: usize,
-    dst: &mut [u8],
-) -> Option<()> {
+fn rlex_region(data: &[u8], reg: Region, dst: &mut [u8]) -> Option<()> {
+    let Region {
+        x0,
+        y0,
+        rw,
+        rh,
+        w,
+        h,
+    } = reg;
     let mut r = Reader::new(data);
     let palette_count = r.u8()? as usize;
     if palette_count == 0 || palette_count > 127 {
@@ -524,8 +568,7 @@ fn rlex_region(
     let place = |dst: &mut [u8], idx: usize, col: [u8; 3]| {
         put(
             dst,
-            w,
-            h,
+            (w, h),
             x0 + idx % rw,
             y0 + idx / rw,
             col[0],
@@ -553,11 +596,11 @@ fn rlex_region(
             idx += 1;
         }
         // (b) the "suite": one pixel per index from start_index..=stop_index.
-        for si in start_index..=stop_index {
+        for &col in palette.iter().take(stop_index + 1).skip(start_index) {
             if idx >= region {
                 break;
             }
-            place(dst, idx, palette[si]);
+            place(dst, idx, col);
             idx += 1;
         }
     }
@@ -568,16 +611,15 @@ fn rlex_region(
 /// (optionally chroma-subsampled), inverse-transformed to RGBA. Used for smooth
 /// / photographic / gradient content (window chrome, images, video frames).
 /// Output is opaque (the alpha plane isn't applied — the desktop is opaque).
-fn nscodec_region(
-    data: &[u8],
-    x0: usize,
-    y0: usize,
-    rw: usize,
-    rh: usize,
-    w: usize,
-    h: usize,
-    dst: &mut [u8],
-) -> Option<()> {
+fn nscodec_region(data: &[u8], reg: Region, dst: &mut [u8]) -> Option<()> {
+    let Region {
+        x0,
+        y0,
+        rw,
+        rh,
+        w,
+        h,
+    } = reg;
     if rw == 0 || rh == 0 || data.len() < 20 {
         return None;
     }
@@ -631,7 +673,7 @@ fn nscodec_region(
             let r = (yv + cov - cgv).clamp(0, 255) as u8;
             let g = (yv + cgv).clamp(0, 255) as u8;
             let b = (yv - cov - cgv).clamp(0, 255) as u8;
-            put(dst, w, h, x0 + x, y0 + y, r, g, b);
+            put(dst, (w, h), x0 + x, y0 + y, r, g, b);
         }
     }
     Some(())
@@ -659,8 +701,8 @@ fn nsc_plane(rle: &[u8], orig_size: usize) -> Vec<u8> {
 fn nsc_rle(input: &[u8], orig_size: usize) -> Vec<u8> {
     let mut out = vec![0u8; orig_size];
     if orig_size <= 4 {
-        for k in 0..orig_size {
-            out[k] = *input.get(k).unwrap_or(&0);
+        for (k, slot) in out.iter_mut().enumerate() {
+            *slot = *input.get(k).unwrap_or(&0);
         }
         return out;
     }
@@ -876,7 +918,19 @@ mod tests {
         nsc.extend_from_slice(&[0, 0]); // reserved
         nsc.extend_from_slice(&[128, 100, 0]); // Y, Co, Cg planes (raw, 1 byte each)
         let mut dst = vec![0u8; 4];
-        nscodec_region(&nsc, 0, 0, 1, 1, 1, 1, &mut dst).unwrap();
+        nscodec_region(
+            &nsc,
+            Region {
+                x0: 0,
+                y0: 0,
+                rw: 1,
+                rh: 1,
+                w: 1,
+                h: 1,
+            },
+            &mut dst,
+        )
+        .unwrap();
         assert_eq!(dst, vec![228, 128, 28, 255]);
     }
 

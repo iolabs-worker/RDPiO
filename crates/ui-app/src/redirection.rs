@@ -263,8 +263,7 @@ mod tests {
             audio_playback: true,
             audio_input: true,
             camera: true,
-            printer: true,
-            ..Default::default()
+            printer: true
         };
         let routes = cfg.routes();
         assert!(routes.iter().any(|r| r.kind == DeviceKind::Clipboard));

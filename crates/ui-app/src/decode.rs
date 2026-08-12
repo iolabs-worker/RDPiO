@@ -191,7 +191,7 @@ impl<'a> BitReader<'a> {
         let code_num = self.read_ue()?;
         let value = (code_num + 1) as i64 / 2;
         Some(if code_num % 2 == 0 {
-            value as i32 * -1
+            -(value as i32)
         } else {
             value as i32
         })

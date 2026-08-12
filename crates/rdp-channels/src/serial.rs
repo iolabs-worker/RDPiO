@@ -114,7 +114,7 @@ impl SerialChannel {
                 }
                 let device_id = u32::from_le_bytes([pdu[2], pdu[3], pdu[4], pdu[5]]);
                 let _port_type = u32::from_le_bytes([pdu[6], pdu[7], pdu[8], pdu[9]]);
-                let name = String::from_utf8_lossy(&pdu.get(10..).unwrap_or(&[]));
+                let name = String::from_utf8_lossy(pdu.get(10..).unwrap_or(&[]));
                 let name = name.trim_end_matches('\0');
                 tracing::info!(device_id, name, "serial: device announced");
                 // Attach the default port (the platform supplies one per
@@ -172,7 +172,7 @@ impl SerialChannel {
         let result = match major_func {
             IRP_MJ_READ => {
                 let len = u32::from_le_bytes([
-                    *data.get(0).unwrap_or(&0),
+                    *data.first().unwrap_or(&0),
                     *data.get(1).unwrap_or(&0),
                     *data.get(2).unwrap_or(&0),
                     *data.get(3).unwrap_or(&0),
@@ -186,7 +186,7 @@ impl SerialChannel {
             }
             IRP_MJ_WRITE => {
                 if let Some(port) = self.ports.get_mut(&device_id) {
-                    port.write(data) as u32
+                    port.write(data)
                 } else {
                     0
                 }

@@ -3,7 +3,7 @@ name: Release
 # Every push to main publishes/refreshes a rolling `nightly` prerelease.
 # Pushing a `v*` tag publishes a permanent release for that version.
 # Pull requests build and test only — they never publish.
-on:
+"on":
   push:
     branches: [main]
     tags: ['v*']
@@ -38,11 +38,14 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Install Rust
-        run: |
-          rustup toolchain install stable --profile minimal
-          rustup target add ${{ matrix.target }}
-          rustup default stable
+      # Installs the exact toolchain declared in rust-toolchain.toml rather than
+      # hardcoding a channel here. No `toolchain` input: dtolnay/rust-toolchain
+      # resolves the pin from the repository file.
+      - name: Install Rust (pinned toolchain)
+        uses: dtolnay/rust-toolchain@master
+
+      - name: Add build target
+        run: rustup target add ${{ matrix.target }}
 
       - name: Cache cargo registry and build
         uses: actions/cache@v4

@@ -1,0 +1,83 @@
+name: CI
+
+# Runs the full workspace build and test suite on every push and pull request.
+# The main job installs Rust from the repository's rust-toolchain.toml (the
+# pinned default toolchain) via dtolnay/rust-toolchain — no hardcoded version.
+# A separate test-compat job additionally covers the previous Rust releases the
+# project must still support (the MSRV from Cargo.toml's rust-version field),
+# forcing that older toolchain with RUSTUP_TOOLCHAIN so rust-toolchain.toml
+# does not override it.
+"on":
+  push:
+  pull_request:
+  workflow_dispatch:
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  build:
+    name: build-and-test (pinned toolchain)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      # Installs the exact toolchain declared in rust-toolchain.toml
+      # (channel = "stable", profile = "minimal", components = rustfmt/clippy).
+      # No `toolchain` input: the action resolves the pin from the repo file.
+      - uses: dtolnay/rust-toolchain@master
+
+      - name: Cache cargo registry and build
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry/index
+            ~/.cargo/registry/cache
+            ~/.cargo/git/db
+            target
+          key: pinned-${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
+          restore-keys: pinned-${{ runner.os }}-cargo-
+
+      - name: Build workspace (all targets)
+        run: cargo build --workspace --all-targets
+
+      - name: Test workspace (all targets)
+        run: cargo test --workspace --all-targets
+
+  test-compat:
+    name: test-compat (${{ matrix.toolchain }})
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        # Previous Rust releases the project must still support. Lower bound is
+        # Cargo.toml's rust-version (the MSRV); extend this list if more
+        # intermediate releases need coverage.
+        toolchain: [1.77]
+    env:
+      # Force the older toolchain so rust-toolchain.toml does not switch
+      # commands back to the pinned default channel.
+      RUSTUP_TOOLCHAIN: ${{ matrix.toolchain }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: dtolnay/rust-toolchain@master
+        with:
+          toolchain: ${{ matrix.toolchain }}
+
+      - name: Cache cargo registry and build
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry/index
+            ~/.cargo/registry/cache
+            ~/.cargo/git/db
+            target
+          key: compat-${{ matrix.toolchain }}-${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
+          restore-keys: compat-${{ matrix.toolchain }}-${{ runner.os }}-cargo-
+
+      - name: Build workspace (all targets)
+        run: cargo build --workspace --all-targets
+
+      - name: Test workspace (all targets)
+        run: cargo test --workspace --all-targets
